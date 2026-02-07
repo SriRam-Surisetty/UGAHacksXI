@@ -36,8 +36,12 @@ export default function LoginScreen() {
         Alert.alert(title, message);
     };
 
+    const normalizeEmail = (value: string) => value.replace(/\s+/g, '').toLowerCase();
+
     const handleLogin = async () => {
-        if (!email || !password) {
+        const normalizedEmail = normalizeEmail(email);
+
+        if (!normalizedEmail || !password) {
             showAlert('Error', 'Please fill in all fields');
             return;
         }
@@ -49,11 +53,11 @@ export default function LoginScreen() {
         setIsLoading(true);
 
         try {
-            const response = await api.post('/login', { email, password });
+            const response = await api.post('/login', { email: normalizedEmail, password });
 
             if (response.data.access_token) {
                 await saveToken(response.data.access_token);
-                await saveUserId(email);
+                await saveUserId(normalizedEmail);
                 showAlert('Success', 'Login successful');
                 router.replace('/(tabs)');
             }
@@ -116,7 +120,7 @@ export default function LoginScreen() {
                                 style={styles.input}
                                 placeholder="you@company.com"
                                 value={email}
-                                onChangeText={setEmail}
+                                onChangeText={(text) => setEmail(normalizeEmail(text))}
                                 autoCapitalize="none"
                                 keyboardType="email-address"
                                 editable={!isLoading}

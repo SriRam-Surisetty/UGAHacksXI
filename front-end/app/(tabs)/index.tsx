@@ -1,27 +1,60 @@
 import { Image } from 'expo-image';
-import { Platform, StyleSheet, Button } from 'react-native';
+import { Platform, StyleSheet, Button, View as NativeView } from 'react-native';
+// @ts-ignore
+import { useRouter } from 'expo-router';
+// @ts-ignore
+import { Link } from 'expo-router';
 import { useState, useEffect } from 'react';
 
-import { HelloWave } from '@/components/hello-wave';
+// Cast View to any to fix strict TS error "JSX element class does not support attributes"
+const View = NativeView as any;
+
+import { saveUserId, getUserId, deleteUserId, deleteToken } from '@/services/storage';
+import api from '@/services/api';
+
 import ParallaxScrollView from '@/components/parallax-scroll-view';
 import { ThemedText } from '@/components/themed-text';
 import { ThemedView } from '@/components/themed-view';
-import api from '@/services/api';
-
-// @ts-ignore
-import { Link as NativeLink } from 'expo-router';
-
-// Cast Link to any to fix strict TS error "JSX element class does not support attributes"
-const Link = NativeLink as any;
+import { HelloWave } from '@/components/hello-wave';
 
 export default function HomeScreen() {
   const [message, setMessage] = useState('Loading...');
+  const [storedId, setStoredId] = useState<string | null>(null);
+  const [protectedData, setProtectedData] = useState<string>('');
+  const router = useRouter();
 
   useEffect(() => {
+    checkBackend();
+    checkUser();
+  }, []);
+
+  const checkBackend = () => {
     api.get('/')
       .then(response => setMessage(response.data.message))
       .catch(error => setMessage('Error fetching data: ' + error.message));
-  }, []);
+  };
+
+  const checkUser = async () => {
+    const id = await getUserId();
+    setStoredId(id);
+  };
+
+  const handleLogout = async () => {
+    await deleteUserId();
+    await deleteToken();
+    setProtectedData('');
+    await checkUser();
+    alert('Logged out');
+  };
+
+  const testProtected = async () => {
+    try {
+      const response = await api.get('/protected');
+      setProtectedData(`Success: ${JSON.stringify(response.data)} `);
+    } catch (error: any) {
+      setProtectedData(`Error: ${error.response?.status} - ${error.response?.data?.msg || error.message} `);
+    }
+  };
 
   return (
     <ParallaxScrollView
@@ -39,7 +72,24 @@ export default function HomeScreen() {
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Backend Status:</ThemedText>
         <ThemedText>{message}</ThemedText>
+        <Button title="Refresh Backend" onPress={checkBackend} />
       </ThemedView>
+
+      <ThemedView style={styles.stepContainer}>
+        <ThemedText type="subtitle">Authentication Test:</ThemedText>
+        <ThemedText>Current User: {storedId || 'Not Logged In'}</ThemedText>
+
+        <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
+          <Button title="Go to Login" onPress={() => router.push('/login')} />
+          <Button title="Logout" onPress={handleLogout} color="red" />
+        </View>
+
+        <View style={{ marginTop: 10 }}>
+          <Button title="Test Protected API" onPress={testProtected} />
+          <ThemedText>{protectedData}</ThemedText>
+        </View>
+      </ThemedView>
+
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 1: Try it</ThemedText>
         <ThemedText>
@@ -81,8 +131,8 @@ export default function HomeScreen() {
 
         <ThemedText>
           {`Tap the Explore tab to learn more about what's included in this starter app.`}
-        </ThemedText>
-      </ThemedView>
+        </ThemedText >
+      </ThemedView >
       <ThemedView style={styles.stepContainer}>
         <ThemedText type="subtitle">Step 3: Get a fresh start</ThemedText>
         <ThemedText>
@@ -93,7 +143,7 @@ export default function HomeScreen() {
           <ThemedText type="defaultSemiBold">app-example</ThemedText>.
         </ThemedText>
       </ThemedView>
-    </ParallaxScrollView>
+    </ParallaxScrollView >
   );
 }
 

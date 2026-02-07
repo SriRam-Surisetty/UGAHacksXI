@@ -1,15 +1,15 @@
 import { useState } from 'react';
-import { 
-    StyleSheet, 
-    Text, 
-    View, 
-    TextInput, 
-    TouchableOpacity, 
-    Alert, 
-    ScrollView, 
-    SafeAreaView, 
+import {
+    Alert,
+    Dimensions,
     Platform,
-    Dimensions
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -33,23 +33,21 @@ export default function LoginScreen() {
         }
 
         try {
-            // Note: The backend expects 'username', but the UI asks for 'email'. 
-            // Depending on backend, we might need to send email as username or adjust backend.
-            // For now, I'll send email as username to match the previous implementation's contract, 
-            // assuming the user might use email as username or the backend handles it.
-            // Or better, I will use email as the value for username field.
             const response = await api.post('/login', { username: email, password });
 
             if (response.data.access_token) {
                 await saveToken(response.data.access_token);
-                await saveUserId(email); 
-                Alert.alert('Success', 'Login Successful');
-                router.replace('/(tabs)'); 
+                await saveUserId(email);
+                Alert.alert('Success', 'Login successful');
+                router.replace('/(tabs)');
             }
         } catch (error: any) {
-            console.log(error);
-            Alert.alert('Login Failed', error.response?.data?.msg || 'An error occurred');
+            Alert.alert('Login failed', error.response?.data?.msg || 'An error occurred');
         }
+    };
+
+    const handleForgotPassword = () => {
+        Alert.alert('Reset password', 'Password reset is not available yet.');
     };
 
     const navigateToHome = () => {
@@ -63,39 +61,36 @@ export default function LoginScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
-            
-            {/* Navigation */}
+            <View style={styles.backgroundBase}>
+                <View style={styles.orbTop} />
+                <View style={styles.orbBottom} />
+                <View style={styles.gridOverlay} />
+            </View>
+
             <View style={styles.nav}>
                 <View style={styles.navContainer}>
-                    <TouchableOpacity onPress={navigateToHome}>
+                    <TouchableOpacity onPress={navigateToHome} style={styles.logoWrap}>
+                        <View style={styles.logoMark} />
                         <Text style={styles.logo}>StockSense</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={navigateToHome} style={styles.backLink}>
-                        <Ionicons name="arrow-back" size={16} color="white" />
-                        <Text style={styles.backLinkText}>Back to home</Text>
+                        <Ionicons name="arrow-back" size={16} color={Colors.landing.white} />
+                        <Text style={styles.backLinkText}>Back</Text>
                     </TouchableOpacity>
                 </View>
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Background Decor */}
-                <View style={styles.purpleHeader} />
-
-                {/* Main Content */}
                 <View style={styles.mainContent}>
-                    <View style={styles.loginContainer}>
-                        <View style={styles.loginHeader}>
-                            <Text style={styles.title}>Welcome back</Text>
-                            <View style={styles.subtitleContainer}>
-                                <Text style={styles.subtitle}>Don't have an account? </Text>
-                                <TouchableOpacity onPress={navigateToSignup}>
-                                    <Text style={styles.linkText}>Sign up for free</Text>
-                                </TouchableOpacity>
-                            </View>
+                    <View style={styles.card}>
+                        <View style={styles.cardHeader}>
+                            <Text style={styles.kicker}>Sign in</Text>
+                            <Text style={styles.title}>Welcome back.</Text>
+                            <Text style={styles.subtitle}>Use your account to get back to your inventory.</Text>
                         </View>
 
                         <View style={styles.formGroup}>
-                            <Text style={styles.label}>Email address (Hint: test)</Text>
+                            <Text style={styles.label}>Email</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="you@company.com"
@@ -107,7 +102,7 @@ export default function LoginScreen() {
                         </View>
 
                         <View style={styles.formGroup}>
-                            <Text style={styles.label}>Password (Hint: test)</Text>
+                            <Text style={styles.label}>Password</Text>
                             <TextInput
                                 style={styles.input}
                                 placeholder="Enter your password"
@@ -118,8 +113,8 @@ export default function LoginScreen() {
                         </View>
 
                         <View style={styles.formOptions}>
-                            <TouchableOpacity 
-                                style={styles.rememberMe} 
+                            <TouchableOpacity
+                                style={styles.rememberMe}
                                 onPress={() => setRememberMe(!rememberMe)}
                             >
                                 <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
@@ -127,64 +122,22 @@ export default function LoginScreen() {
                                 </View>
                                 <Text style={styles.rememberLabel}>Remember me</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity>
+                            <TouchableOpacity onPress={handleForgotPassword}>
                                 <Text style={styles.forgotPassword}>Forgot password?</Text>
                             </TouchableOpacity>
                         </View>
 
-                        <TouchableOpacity style={styles.btnLogin} onPress={handleLogin}>
-                            <Text style={styles.btnLoginText}>Sign in</Text>
+                        <TouchableOpacity style={styles.btnPrimary} onPress={handleLogin}>
+                            <Text style={styles.btnPrimaryText}>Sign in</Text>
                         </TouchableOpacity>
 
-                        <View style={styles.divider}>
-                            <View style={styles.dividerLine} />
-                            <Text style={styles.dividerText}>Or continue with</Text>
-                            <View style={styles.dividerLine} />
-                        </View>
-
-                        <View style={styles.socialLogin}>
-                            <TouchableOpacity style={styles.btnSocial}>
-                                <Ionicons name="logo-google" size={20} color="#DB4437" />
-                                <Text style={styles.btnSocialText}>Google</Text>
-                            </TouchableOpacity>
-                            <TouchableOpacity style={styles.btnSocial}>
-                                <Ionicons name="logo-facebook" size={20} color="#4267B2" />
-                                <Text style={styles.btnSocialText}>Facebook</Text>
+                        <View style={styles.inlineFooter}>
+                            <Text style={styles.inlineText}>New here?</Text>
+                            <TouchableOpacity onPress={navigateToSignup}>
+                                <Text style={styles.inlineLink}>Create an account</Text>
                             </TouchableOpacity>
                         </View>
                     </View>
-                </View>
-
-                {/* Stats Section */}
-                <View style={styles.statsSection}>
-                    <View style={styles.statsContainer}>
-                        <Text style={styles.statsTitle}>
-                            Join thousands of SMB owners already saving with StockSense
-                        </Text>
-                        <View style={styles.statsGrid}>
-                            <View style={styles.statItem}>
-                                <Text style={styles.statNumber}>40%</Text>
-                                <Text style={styles.statLabel}>Average Waste Reduction</Text>
-                            </View>
-                            <View style={styles.statItem}>
-                                <Text style={styles.statNumber}>$15K</Text>
-                                <Text style={styles.statLabel}>Average Monthly Savings</Text>
-                            </View>
-                            <View style={styles.statItem}>
-                                <Text style={styles.statNumber}>95%</Text>
-                                <Text style={styles.statLabel}>Prediction Accuracy</Text>
-                            </View>
-                            <View style={styles.statItem}>
-                                <Text style={styles.statNumber}>2.5K+</Text>
-                                <Text style={styles.statLabel}>Active SMBs</Text>
-                            </View>
-                        </View>
-                    </View>
-                </View>
-
-                {/* Footer */}
-                <View style={styles.footer}>
-                    <Text style={styles.footerText}>© 2026 StockSense. All rights reserved.</Text>
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -196,25 +149,48 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.landing.lightPurple,
     },
-    purpleHeader: {
+    backgroundBase: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: Colors.landing.lightPurple,
+    },
+    orbTop: {
         position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: 400,
+        top: -width * 0.4,
+        right: -width * 0.2,
+        width: width * 0.9,
+        height: width * 0.9,
+        borderRadius: width * 0.45,
         backgroundColor: Colors.landing.primaryPurple,
-        zIndex: 0,
+        opacity: 0.9,
+    },
+    orbBottom: {
+        position: 'absolute',
+        bottom: -width * 0.3,
+        left: -width * 0.2,
+        width: width * 0.7,
+        height: width * 0.7,
+        borderRadius: width * 0.35,
+        backgroundColor: Colors.landing.accentPurple,
+        opacity: 0.2,
+    },
+    gridOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'transparent',
+        opacity: 0.06,
+        borderTopWidth: 1,
+        borderLeftWidth: 1,
+        borderColor: Colors.landing.primaryPurple,
+        transform: [{ rotate: '1deg' }],
     },
     nav: {
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
-        height: Platform.OS === 'ios' ? 100 : 80,
+        height: Platform.OS === 'ios' ? 90 : 70,
         paddingTop: Platform.OS === 'ios' ? 40 : 20,
-        zIndex: 100, // Increased to ensure it sits above content
-        elevation: 20, // Added for Android
-        backgroundColor: Colors.landing.primaryPurple, 
+        zIndex: 100,
+        backgroundColor: 'transparent',
         justifyContent: 'center',
     },
     navContainer: {
@@ -222,94 +198,99 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        maxWidth: 1400,
+        maxWidth: 1200,
         alignSelf: 'center',
         width: '100%',
     },
+    logoWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    logoMark: {
+        width: 14,
+        height: 14,
+        borderRadius: 4,
+        backgroundColor: Colors.landing.white,
+    },
     logo: {
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: '700',
         color: Colors.landing.white,
     },
     backLink: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
+        gap: 6,
     },
     backLinkText: {
         color: Colors.landing.white,
-        fontWeight: '500',
-        fontSize: 15,
+        fontWeight: '600',
+        fontSize: 14,
     },
     scrollContent: {
         flexGrow: 1,
         paddingTop: Platform.OS === 'ios' ? 100 : 80,
+        paddingBottom: 40,
     },
     mainContent: {
+        flex: 1,
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 20,
-        marginTop: 40,
-        marginBottom: 60,
-        zIndex: 1,
+        minHeight: 600,
     },
-    loginContainer: {
+    card: {
         width: '100%',
         maxWidth: 480,
         backgroundColor: Colors.landing.white,
-        borderRadius: 12,
-        padding: 30,
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 10,
-        },
-        shadowOpacity: 0.15,
+        borderRadius: 20,
+        padding: 28,
+        shadowColor: '#111111',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.2,
         shadowRadius: 30,
-        elevation: 10,
+        elevation: 12,
         borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.05)',
+        borderColor: 'rgba(52, 23, 85, 0.08)',
     },
-    loginHeader: {
-        alignItems: 'center',
-        marginBottom: 30,
+    cardHeader: {
+        marginBottom: 24,
+    },
+    kicker: {
+        textTransform: 'uppercase',
+        letterSpacing: 2,
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.landing.accentPurple,
+        marginBottom: 10,
     },
     title: {
         fontSize: 28,
         fontWeight: '700',
         color: Colors.landing.black,
-        marginBottom: 10,
-    },
-    subtitleContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
+        marginBottom: 8,
     },
     subtitle: {
-        color: '#666',
-        fontSize: 16,
-    },
-    linkText: {
-        color: Colors.landing.primaryPurple,
-        fontWeight: '600',
-        fontSize: 16,
+        fontSize: 15,
+        color: '#4a4a4a',
     },
     formGroup: {
-        marginBottom: 20,
+        marginBottom: 18,
     },
     label: {
         marginBottom: 8,
         color: Colors.landing.black,
-        fontWeight: '500',
-        fontSize: 15,
+        fontWeight: '600',
+        fontSize: 14,
     },
     input: {
         width: '100%',
         paddingVertical: 12,
-        paddingHorizontal: 15,
-        borderWidth: 2,
-        borderColor: '#e0e0e0',
-        borderRadius: 6,
+        paddingHorizontal: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(52, 23, 85, 0.15)',
+        borderRadius: 12,
         fontSize: 16,
         backgroundColor: Colors.landing.white,
     },
@@ -317,7 +298,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
-        marginBottom: 25,
+        marginBottom: 22,
     },
     rememberMe: {
         flexDirection: 'row',
@@ -328,10 +309,11 @@ const styles = StyleSheet.create({
         width: 18,
         height: 18,
         borderWidth: 2,
-        borderColor: '#ccc',
-        borderRadius: 4,
+        borderColor: 'rgba(52, 23, 85, 0.3)',
+        borderRadius: 5,
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: Colors.landing.white,
     },
     checkboxChecked: {
         backgroundColor: Colors.landing.primaryPurple,
@@ -339,107 +321,42 @@ const styles = StyleSheet.create({
     },
     rememberLabel: {
         fontSize: 14,
-        color: '#666',
+        color: '#4a4a4a',
     },
     forgotPassword: {
-        color: Colors.landing.primaryPurple,
+        color: Colors.landing.accentPurple,
         fontSize: 14,
-        fontWeight: '500',
-    },
-    btnLogin: {
-        width: '100%',
-        padding: 15,
-        backgroundColor: Colors.landing.primaryPurple,
-        borderRadius: 6,
-        alignItems: 'center',
-    },
-    btnLoginText: {
-        color: Colors.landing.white,
-        fontSize: 16,
         fontWeight: '600',
     },
-    divider: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginVertical: 25,
-    },
-    dividerLine: {
-        flex: 1,
-        height: 1,
-        backgroundColor: '#e0e0e0',
-    },
-    dividerText: {
-        marginHorizontal: 15,
-        color: '#999',
-        fontSize: 14,
-    },
-    socialLogin: {
-        flexDirection: 'row',
-        gap: 15,
-    },
-    btnSocial: {
-        flex: 1,
-        padding: 12,
-        backgroundColor: Colors.landing.white,
-        borderWidth: 2,
-        borderColor: '#e0e0e0',
-        borderRadius: 6,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: 8,
-    },
-    btnSocialText: {
-        fontSize: 14,
-        fontWeight: '500',
-        color: Colors.landing.black,
-    },
-    statsSection: {
-        backgroundColor: Colors.landing.primaryPurple,
-        paddingVertical: 60,
-        paddingHorizontal: 20,
-    },
-    statsContainer: {
-        maxWidth: 1200,
-        alignSelf: 'center',
-        alignItems: 'center',
-    },
-    statsTitle: {
-        fontSize: 24,
-        fontWeight: '700',
-        color: Colors.landing.white,
-        textAlign: 'center',
-        marginBottom: 40,
-    },
-    statsGrid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
-        gap: 30,
+    btnPrimary: {
         width: '100%',
-    },
-    statItem: {
+        paddingVertical: 14,
+        backgroundColor: Colors.landing.primaryPurple,
+        borderRadius: 12,
         alignItems: 'center',
-        minWidth: 150,
+        shadowColor: Colors.landing.primaryPurple,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
     },
-    statNumber: {
-        fontSize: 40,
-        fontWeight: '700',
+    btnPrimaryText: {
         color: Colors.landing.white,
-        marginBottom: 5,
-    },
-    statLabel: {
         fontSize: 16,
-        color: 'rgba(255,255,255,0.9)',
-        textAlign: 'center',
+        fontWeight: '700',
     },
-    footer: {
-        backgroundColor: Colors.landing.black,
-        padding: 20,
-        alignItems: 'center',
+    inlineFooter: {
+        flexDirection: 'row',
+        justifyContent: 'center',
+        gap: 6,
+        marginTop: 18,
     },
-    footerText: {
-        color: '#666',
+    inlineText: {
+        color: '#4a4a4a',
+        fontSize: 14,
+    },
+    inlineLink: {
+        color: Colors.landing.primaryPurple,
+        fontWeight: '700',
         fontSize: 14,
     },
 });

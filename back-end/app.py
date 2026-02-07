@@ -71,6 +71,14 @@ def signup():
         if missing_fields:
             return jsonify({"error": f"Missing fields: {', '.join(missing_fields)}"}), 400
 
+        existing_org = Org.query.filter_by(orgName=data.get("orgName")).first()
+        if existing_org:
+            return jsonify({"msg": "Organization name already exists"}), 409
+
+        existing_user = User.query.filter_by(email=data.get("email")).first()
+        if existing_user:
+            return jsonify({"msg": "Email already exists"}), 409
+
         # ... logic for creating Org and Admin User ...
         new_org = Org(orgName=data.get("orgName"), org_email=data.get("email"))
         db.session.add(new_org)

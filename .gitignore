@@ -1,0 +1,13 @@
+
+# Environment variables
+.env
+.idea
+.DS_Store
+.vscode
+__pycache__/
+*.pyc
+.crt
+
+# Expo
+.expo/
+node_modules/

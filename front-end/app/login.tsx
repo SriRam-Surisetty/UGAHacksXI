@@ -206,10 +206,16 @@ const styles = StyleSheet.create({
         zIndex: 0,
     },
     nav: {
-        paddingTop: Platform.OS === 'android' ? 40 : 10,
-        paddingBottom: 20,
-        zIndex: 10,
-        backgroundColor: Colors.landing.primaryPurple, // Match header background for status bar area
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: Platform.OS === 'ios' ? 100 : 80,
+        paddingTop: Platform.OS === 'ios' ? 40 : 20,
+        zIndex: 100, // Increased to ensure it sits above content
+        elevation: 20, // Added for Android
+        backgroundColor: Colors.landing.primaryPurple, 
+        justifyContent: 'center',
     },
     navContainer: {
         flexDirection: 'row',
@@ -237,6 +243,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         flexGrow: 1,
+        paddingTop: Platform.OS === 'ios' ? 100 : 80,
     },
     mainContent: {
         alignItems: 'center',

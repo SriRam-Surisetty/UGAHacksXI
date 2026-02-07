@@ -337,10 +337,16 @@ const styles = StyleSheet.create({
         zIndex: 0,
     },
     nav: {
-        paddingTop: Platform.OS === 'android' ? 40 : 10,
-        paddingBottom: 20,
-        zIndex: 10,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        height: Platform.OS === 'ios' ? 100 : 80,
+        paddingTop: Platform.OS === 'ios' ? 40 : 20,
+        zIndex: 100,
+        elevation: 20,
         backgroundColor: Colors.landing.primaryPurple, 
+        justifyContent: 'center',
     },
     navContainer: {
         flexDirection: 'row',
@@ -368,6 +374,7 @@ const styles = StyleSheet.create({
     },
     scrollContent: {
         flexGrow: 1,
+        paddingTop: Platform.OS === 'ios' ? 100 : 80,
     },
     mainContent: {
         alignItems: 'center',

@@ -13,11 +13,18 @@ const TextInput = NativeTextInput as any;
 export default function SignupScreen() {
     const [username, setUsername] = useState('');
     const [password, setPassword] = useState('');
+    const [orgName, setOrgName] = useState('');
+    const [email, setEmail] = useState('');
     const router = useRouter();
 
     const handleSignup = async () => {
         try {
-            const response = await api.post('/signup', { username, password });
+            const response = await api.post('/signup', { 
+                username, 
+                password,
+                orgName,
+                email
+            });
 
             if (response.data.access_token) {
                 await saveToken(response.data.access_token);
@@ -33,6 +40,22 @@ export default function SignupScreen() {
     return (
         <ThemedView style={styles.container}>
             <ThemedText type="title">Sign Up</ThemedText>
+
+            <TextInput
+                style={styles.input}
+                placeholder="Organization Name"
+                value={orgName}
+                onChangeText={setOrgName}
+            />
+
+            <TextInput
+                style={styles.input}
+                placeholder="Email"
+                value={email}
+                onChangeText={setEmail}
+                keyboardType="email-address"
+                autoCapitalize="none"
+            />
 
             <TextInput
                 style={styles.input}

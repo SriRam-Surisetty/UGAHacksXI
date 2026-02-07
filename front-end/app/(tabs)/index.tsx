@@ -49,7 +49,7 @@ export default function HomeScreen() {
 
   const testProtected = async () => {
     try {
-      const response = await api.get('/protected');
+      const response = await api.get('/api/dishes');
       setProtectedData(`Success: ${JSON.stringify(response.data)} `);
     } catch (error: any) {
       setProtectedData(`Error: ${error.response?.status} - ${error.response?.data?.msg || error.message} `);
@@ -85,7 +85,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={{ marginTop: 10 }}>
-          <Button title="Test Protected API" onPress={testProtected} />
+          <Button title="Test Get Dishes" onPress={testProtected} />
           <ThemedText>{protectedData}</ThemedText>
         </View>
       </ThemedView>

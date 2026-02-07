@@ -21,8 +21,6 @@ import { saveToken, saveUserId } from '@/services/storage';
 const { width } = Dimensions.get('window');
 
 export default function SignupScreen() {
-    const [firstName, setFirstName] = useState('');
-    const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
@@ -34,13 +32,12 @@ export default function SignupScreen() {
     const [state, setState] = useState('');
     const [zipCode, setZipCode] = useState('');
     const [country, setCountry] = useState('United States');
-    const [phone, setPhone] = useState('');
 
     const [termsAccepted, setTermsAccepted] = useState(false);
     const router = useRouter();
 
     const handleSignup = async () => {
-        if (!firstName || !lastName || !email || !password || !confirmPassword || !orgName || !address1 || !city || !state || !zipCode || !country || !phone) {
+        if (!email || !password || !confirmPassword || !orgName || !address1 || !city || !state || !zipCode || !country) {
             Alert.alert('Error', 'Please fill in all required fields');
             return;
         }

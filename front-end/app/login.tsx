@@ -26,9 +26,18 @@ export default function LoginScreen() {
     const [rememberMe, setRememberMe] = useState(false);
     const router = useRouter();
 
+    const showAlert = (title: string, message: string) => {
+        if (Platform.OS === 'web' && typeof globalThis !== 'undefined' && 'alert' in globalThis) {
+            (globalThis as { alert: (text: string) => void }).alert(`${title}\n\n${message}`);
+            return;
+        }
+
+        Alert.alert(title, message);
+    };
+
     const handleLogin = async () => {
         if (!email || !password) {
-            Alert.alert('Error', 'Please fill in all fields');
+            showAlert('Error', 'Please fill in all fields');
             return;
         }
 
@@ -38,16 +47,16 @@ export default function LoginScreen() {
             if (response.data.access_token) {
                 await saveToken(response.data.access_token);
                 await saveUserId(email);
-                Alert.alert('Success', 'Login successful');
+                showAlert('Success', 'Login successful');
                 router.replace('/(tabs)');
             }
         } catch (error: any) {
-            Alert.alert('Login failed', error.response?.data?.msg || 'An error occurred');
+            showAlert('Login failed', error.response?.data?.msg || 'An error occurred');
         }
     };
 
     const handleForgotPassword = () => {
-        Alert.alert('Reset password', 'Password reset is not available yet.');
+        showAlert('Reset password', 'Password reset is not available yet.');
     };
 
     const navigateToHome = () => {

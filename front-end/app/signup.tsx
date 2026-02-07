@@ -36,19 +36,28 @@ export default function SignupScreen() {
     const [termsAccepted, setTermsAccepted] = useState(false);
     const router = useRouter();
 
+    const showAlert = (title: string, message: string) => {
+        if (Platform.OS === 'web' && typeof globalThis !== 'undefined' && 'alert' in globalThis) {
+            (globalThis as { alert: (text: string) => void }).alert(`${title}\n\n${message}`);
+            return;
+        }
+
+        Alert.alert(title, message);
+    };
+
     const handleSignup = async () => {
         if (!email || !password || !confirmPassword || !orgName || !address1 || !city || !state || !zipCode || !country) {
-            Alert.alert('Error', 'Please fill in all required fields');
+            showAlert('Error', 'Please fill in all required fields');
             return;
         }
 
         if (password !== confirmPassword) {
-            Alert.alert('Error', 'Passwords do not match');
+            showAlert('Error', 'Passwords do not match');
             return;
         }
 
         if (!termsAccepted) {
-            Alert.alert('Error', 'You must agree to the Terms of Service');
+            showAlert('Error', 'You must agree to the Terms of Service');
             return;
         }
 
@@ -62,11 +71,11 @@ export default function SignupScreen() {
             if (response.data.access_token) {
                 await saveToken(response.data.access_token);
                 await saveUserId(email);
-                Alert.alert('Success', 'Account created successfully');
+                showAlert('Success', 'Account created successfully');
                 router.replace('/(tabs)');
             }
         } catch (error: any) {
-            Alert.alert('Signup failed', error.response?.data?.msg || 'An error occurred');
+            showAlert('Signup failed', error.response?.data?.msg || 'An error occurred');
         }
     };
 

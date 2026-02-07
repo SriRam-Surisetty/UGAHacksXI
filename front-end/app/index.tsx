@@ -1,619 +1,315 @@
-import React, { useRef, useEffect } from 'react';
-import { 
-  StyleSheet, 
-  Text, 
-  View, 
-  ScrollView, 
-  TouchableOpacity, 
-  Dimensions, 
-  SafeAreaView, 
-  Platform, 
-  Animated 
-} from 'react-native';
-import { Stack, useRouter } from 'expo-router';
-import { StatusBar } from 'expo-status-bar';
-import { Colors } from '@/constants/theme';
-import { Ionicons } from '@expo/vector-icons';
+import React, { useState, useEffect, useRef } from 'react';
+import { Link } from 'expo-router';
 
-const { width } = Dimensions.get('window');
+// Helper to render HTML content safely (for bot messages with links)
+const SafeHTML = ({ html }: { html: string }) => {
+  return <div dangerouslySetInnerHTML={{ __html: html }} />;
+};
 
 const LandingPage = () => {
-  const router = useRouter();
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const startY = useRef(new Animated.Value(50)).current;
+  const [isChatbotOpen, setIsChatbotOpen] = useState(false);
+  const [messages, setMessages] = useState<{ text: string; isUser: boolean }[]>([
+    { text: "Hi! 👋 I'm your AI assistant. How can I help you with StockSense today?", isUser: false },
+  ]);
+  const [inputValue, setInputValue] = useState('');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 1000,
-        useNativeDriver: true,
-      }),
-      Animated.timing(startY, {
-        toValue: 0,
-        duration: 800,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
-
-  const navigateToLogin = () => {
-    router.push('/login');
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
 
-  const navigateToSignup = () => {
-    // Assuming you have a signup route, otherwise push to login or register
-     router.push('/signup');
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, isChatbotOpen]);
+
+  // Chatbot logic
+  const addMessage = (text: string, isUser: boolean) => {
+    setMessages(prev => [...prev, { text, isUser }]);
+  };
+
+  const getBotResponse = (userMessage: string) => {
+    const lowerMessage = userMessage.toLowerCase();
+    let response = '';
+
+    if (lowerMessage.includes('ai') || lowerMessage.includes('work')) {
+      response = 'Our AI uses advanced machine learning algorithms to analyze your inventory patterns and predict stockouts with 95% accuracy. It continuously learns from your data to provide smarter recommendations! 🧠';
+    } else if (lowerMessage.includes('pricing') || lowerMessage.includes('cost')) {
+      response = 'We offer flexible pricing plans starting from $49/month. All plans include AI forecasting, real-time tracking, and 24/7 support. Want to see our full pricing? <a href="#pricing" style="color: #341755; text-decoration: underline;">Check it out</a> 💰';
+    } else if (lowerMessage.includes('trial') || lowerMessage.includes('free')) {
+      response = 'Great! You can start your free 14-day trial right now - no credit card required. <a href="/signup" style="color: #341755; text-decoration: underline;">Sign up here</a> to get started! 🚀';
+    } else if (lowerMessage.includes('waste')) {
+      response = 'Our platform helps reduce waste by 40% on average through predictive analytics and smart reordering. You\'ll save money and help the environment! 🌱';
+    } else if (lowerMessage.includes('demo')) {
+      response = 'I\'d love to show you a demo! You can <a href="#" style="color: #341755; text-decoration: underline;">book a personalized demo</a> with our team or watch a quick video tour. 🎥';
+    } else {
+      response = 'That\'s a great question! I recommend chatting with our team for more details. You can <a href="/signup" style="color: #341755; text-decoration: underline;">start your free trial</a> or <a href="#contact" style="color: #341755; text-decoration: underline;">contact us</a> directly. 😊';
+    }
+
+    setTimeout(() => {
+      addMessage(response, false);
+    }, 500);
+  };
+
+  const handleSend = () => {
+    if (!inputValue.trim()) return;
+    addMessage(inputValue, true);
+    setInputValue('');
+    getBotResponse(inputValue);
+  };
+
+  const handleQuickReply = (text: string) => {
+    addMessage(text, true);
+    getBotResponse(text);
   };
 
   return (
-    <SafeAreaView style={styles.container}>
-      <StatusBar style="dark" />
-      <Stack.Screen options={{ headerShown: false }} />
-      
-      {/* Navigation */}
-      <View style={styles.nav}>
-        <View style={styles.navContainer}>
-            <View style={styles.logoContainer}>
-                <Text style={styles.logoIcon}>◆</Text>
-                <Text style={styles.logoText}>StockSense</Text>
-            </View>
-            
-            <View style={styles.navActions}>
-                <TouchableOpacity onPress={navigateToLogin} style={styles.navLoginBtn}>
-                    <Text style={styles.navLoginText}>Login</Text>
-                </TouchableOpacity>
-                <TouchableOpacity onPress={navigateToSignup} style={styles.navCtaBtn}>
-                     <Text style={styles.navCtaText}>Get Started</Text>
-                </TouchableOpacity>
-            </View>
-        </View>
-      </View>
+    <div className="font-sans text-black bg-white overflow-x-hidden relative">
+        <div className="particles">
+            <div className="particle"></div>
+            <div className="particle"></div>
+            <div className="particle"></div>
+            <div className="particle"></div>
+            <div className="particle"></div>
+        </div>
 
-      <ScrollView 
-        contentContainerStyle={styles.scrollContent}
-        showsVerticalScrollIndicator={false}
-      >
+        {/* Navigation */}
+        <nav>
+            <div className="nav-container">
+                <Link href="/" className="logo">StockSense</Link>
+                <ul className="nav-links">
+                    <li><a href="#pricing">Pricing</a></li>
+                    <li><a href="#contact">Contact</a></li>
+                </ul>
+                <div className="nav-cta-group">
+                    <Link href="/login" className="nav-login">Login</Link>
+                    <Link href="/signup" className="nav-cta">Get Started</Link>
+                </div>
+            </div>
+        </nav>
+
         {/* Hero Section */}
-        <Animated.View style={[styles.hero, { opacity: fadeAnim, transform: [{ translateY: startY }] }]}>
-            <View style={styles.badge}>
-                <Text style={styles.badgeIcon}>✦</Text>
-                <Text style={styles.badgeText}>AI-Powered Intelligence</Text>
-            </View>
-            
-            <Text style={styles.heroTitle}>The Future of</Text>
-            <Text style={styles.heroTitleGradient}>Waste Prevention</Text>
-            
-            <Text style={styles.heroDescription}>
-                Harness advanced AI to predict stockouts, eliminate waste, and maximize profit. Transform your inventory into intelligent, self-optimizing systems.
-            </Text>
-
-            <View style={styles.heroButtons}>
-                <TouchableOpacity onPress={navigateToSignup} style={styles.primaryBtn}>
-                    <Text style={styles.primaryBtnText}>Start Free Trial</Text>
-                    <Ionicons name="arrow-forward" size={20} color={Colors.landing.white} />
-                </TouchableOpacity>
-                
-                <TouchableOpacity style={styles.secondaryBtn}>
-                    <Text style={styles.secondaryBtnText}>Watch Demo</Text>
-                </TouchableOpacity>
-            </View>
-
-            {/* Dashboard Preview */}
-            <View style={styles.dashboardPreview}>
-                <View style={styles.dashboardHeader}>
-                    <View style={styles.dot} />
-                    <View style={styles.dot} />
-                    <View style={styles.dot} />
-                </View>
-                <View style={styles.dashboardContent}>
-                    <Text style={styles.dashboardLabel}>PREDICTIVE AI SYSTEM</Text>
-                    <Text style={styles.dashboardTitle}>Intelligence Dashboard</Text>
-                </View>
-            </View>
-        </Animated.View>
+        <section className="hero">
+            <div className="hero-container">
+                <div className="ai-badge">AI-Powered Intelligence</div>
+                <h1>The Future of <span className="gradient-text">Waste Prevention</span></h1>
+                <p>Harness advanced AI to predict stockouts, eliminate waste, and maximize profit. Transform your inventory into intelligent, self-optimizing systems.</p>
+                <div className="hero-buttons">
+                    <Link href="/signup" className="btn-primary">
+                        Start Free Trial
+                        <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
+                            <path d="M10 0L8.59 1.41L15.17 8H0V10H15.17L8.59 16.59L10 18L20 10L10 0Z"/>
+                        </svg>
+                    </Link>
+                    <a href="#" className="btn-secondary">Watch Demo</a>
+                </div>
+                <div className="dashboard-preview">
+                    <div className="dashboard-wrapper">
+                        <div className="dashboard-header">
+                            <div className="dashboard-dot"></div>
+                            <div className="dashboard-dot"></div>
+                            <div className="dashboard-dot"></div>
+                        </div>
+                        <div className="dashboard-content">
+                            <div className="dashboard-display">
+                                <div className="dashboard-label">Predictive AI System</div>
+                                <div className="dashboard-title">Intelligence Dashboard</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         {/* Stats Section */}
-        <View style={styles.statsSection}>
-            <View style={styles.statCard}>
-                <Text style={styles.statValue}>40%</Text>
-                <Text style={styles.statLabel}>Waste Reduction</Text>
-            </View>
-            <View style={styles.statCard}>
-                <Text style={styles.statValue}>$15K</Text>
-                <Text style={styles.statLabel}>Monthly Savings</Text>
-            </View>
-            <View style={styles.statCard}>
-                <Text style={styles.statValue}>95%</Text>
-                <Text style={styles.statLabel}>AI Accuracy</Text>
-            </View>
-            <View style={styles.statCard}>
-                <Text style={styles.statValue}>2.5K+</Text>
-                <Text style={styles.statLabel}>Active Users</Text>
-            </View>
-        </View>
+        <section className="stats-section">
+            <div className="stats-container">
+                <div className="stats-grid">
+                    <div className="stat-card">
+                        <h3>40%</h3>
+                        <p>Waste Reduction</p>
+                    </div>
+                    <div className="stat-card">
+                        <h3>$15K</h3>
+                        <p>Monthly Savings</p>
+                    </div>
+                    <div className="stat-card">
+                        <h3>95%</h3>
+                        <p>AI Accuracy</p>
+                    </div>
+                    <div className="stat-card">
+                        <h3>2.5K+</h3>
+                        <p>Active Users</p>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         {/* Features Section */}
-        <View style={styles.featuresSection}>
-            <View style={styles.sectionHeader}>
-                <Text style={styles.sectionTitle}>Advanced</Text>
-                <Text style={styles.sectionTitleGradient}>AI Intelligence</Text>
-                <Text style={styles.sectionDesc}>
-                    Neural networks and machine learning algorithms that continuously optimize your inventory in real-time.
-                </Text>
-            </View>
+        <section className="features">
+            <div className="features-container">
+                <div className="section-header">
+                    <h2>Advanced <span className="gradient-text">AI Intelligence</span></h2>
+                    <p>Neural networks and machine learning algorithms that continuously optimize your inventory in real-time.</p>
+                </div>
 
-            {/* Feature 1 */}
-            <View style={styles.featureShowcase}>
-                <View style={styles.featureContent}>
-                    <Text style={styles.featureTitle}>Predictive Forecasting</Text>
-                    <Text style={styles.featureText}>
-                        Advanced AI algorithms analyze millions of data points to predict stockouts with 95% accuracy.
-                    </Text>
-                    <TouchableOpacity onPress={navigateToSignup}>
-                        <Text style={styles.featureLink}>Explore AI →</Text>
-                    </TouchableOpacity>
-                </View>
-                 <View style={styles.featureVisual}>
-                    <Text style={styles.featureIcon}>🧠</Text>
-                    <Text style={styles.featureVisualLabel}>Neural Network</Text>
-                </View>
-            </View>
+                <div className="feature-showcase">
+                    <div className="feature-content">
+                        <h3>Predictive Forecasting</h3>
+                        <p>Advanced AI algorithms analyze millions of data points to predict stockouts with 95% accuracy. Make informed decisions before problems arise.</p>
+                        <Link href="/signup" className="btn-primary">Explore AI</Link>
+                    </div>
+                    <div className="feature-visual">
+                        <div className="feature-visual-content">
+                            <div className="feature-icon">🧠</div>
+                            <div className="feature-visual-label">Neural Network Analysis</div>
+                        </div>
+                    </div>
+                </div>
 
-            {/* Feature 2 (Reverse on wide screens, same stack on mobile) */}
-            <View style={styles.featureShowcase}>
-                <View style={styles.featureContent}>
-                    <Text style={styles.featureTitle}>Live Inventory Intelligence</Text>
-                    <Text style={styles.featureText}>
-                        Watch your inventory levels update instantly across all touchpoints. Real-time data synchronization.
-                    </Text>
-                    <TouchableOpacity onPress={navigateToSignup}>
-                        <Text style={styles.featureLink}>Start Tracking →</Text>
-                    </TouchableOpacity>
-                </View>
-                 <View style={styles.featureVisual}>
-                    <Text style={styles.featureIcon}>⚡</Text>
-                    <Text style={styles.featureVisualLabel}>Real-Time Sync</Text>
-                </View>
-            </View>
+                <div className="feature-showcase">
+                    <div className="feature-visual">
+                        <div className="feature-visual-content">
+                            <div className="feature-icon">⚡</div>
+                            <div className="feature-visual-label">Real-Time Synchronization</div>
+                        </div>
+                    </div>
+                    <div className="feature-content">
+                        <h3>Live Inventory Intelligence</h3>
+                        <p>Watch your inventory levels update instantly across all touchpoints. Real-time data synchronization ensures you're always informed.</p>
+                        <Link href="/signup" className="btn-primary">Start Tracking</Link>
+                    </div>
+                </div>
 
-             {/* Feature 3 */}
-             <View style={styles.featureShowcase}>
-                <View style={styles.featureContent}>
-                    <Text style={styles.featureTitle}>Smart Waste Detection</Text>
-                    <Text style={styles.featureText}>
-                        Machine learning identifies waste patterns and provides actionable recommendations.
-                    </Text>
-                    <TouchableOpacity onPress={navigateToSignup}>
-                        <Text style={styles.featureLink}>View Analytics →</Text>
-                    </TouchableOpacity>
-                </View>
-                 <View style={styles.featureVisual}>
-                    <Text style={styles.featureIcon}>📊</Text>
-                    <Text style={styles.featureVisualLabel}>Pattern Recognition</Text>
-                </View>
-            </View>
-        </View>
+                <div className="feature-showcase">
+                    <div className="feature-content">
+                        <h3>Smart Waste Detection</h3>
+                        <p>Machine learning identifies waste patterns and provides actionable recommendations. Turn insights into profit-driving decisions.</p>
+                        <Link href="/signup" className="btn-primary">View Analytics</Link>
+                    </div>
+                    <div className="feature-visual">
+                        <div className="feature-visual-content">
+                            <div className="feature-icon">📊</div>
+                            <div className="feature-visual-label">Pattern Recognition</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
 
         {/* CTA Section */}
-        <View style={styles.ctaSection}>
-            <Text style={styles.ctaTitle}>Ready to Transform Your Business?</Text>
-            <Text style={styles.ctaText}>
-                Join thousands of SMB owners using AI to eliminate waste and boost profits.
-            </Text>
-            <TouchableOpacity onPress={navigateToSignup} style={styles.ctaBtn}>
-                <Text style={styles.ctaBtnText}>Get Started Free</Text>
-            </TouchableOpacity>
-        </View>
+        <section className="cta-section">
+            <div className="cta-container">
+                <h2>Ready to Transform Your Business?</h2>
+                <p>Join thousands of SMB owners using AI to eliminate waste, boost profits, and create sustainable operations. Start your journey today.</p>
+                <Link href="/signup" className="btn-white">Get Started Free</Link>
+            </div>
+        </section>
 
         {/* Footer */}
-        <View style={styles.footer}>
-            <Text style={styles.footerBrand}>StockSense</Text>
-            <Text style={styles.footerText}>© 2026 StockSense. All rights reserved.</Text>
-        </View>
+        <footer>
+            <div className="footer-container">
+                <div className="footer-grid">
+                    <div className="footer-brand">
+                        <h3>StockSense</h3>
+                        <p>AI-powered inventory management that helps SMBs eliminate food waste, maximize profits, and create positive environmental impact.</p>
+                    </div>
+                    <div className="footer-links">
+                        <h4>Platform</h4>
+                        <ul>
+                            <li><a href="#">AI Forecasting</a></li>
+                            <li><a href="#">Smart Reordering</a></li>
+                            <li><a href="#">Waste Analytics</a></li>
+                            <li><a href="#">Integrations</a></li>
+                        </ul>
+                    </div>
+                    <div className="footer-links">
+                        <h4>Company</h4>
+                        <ul>
+                            <li><a href="#">About Us</a></li>
+                            <li><a href="#">Our Mission</a></li>
+                            <li><a href="#">Careers</a></li>
+                            <li><a href="#">Contact</a></li>
+                        </ul>
+                    </div>
+                    <div className="footer-links">
+                        <h4>Resources</h4>
+                        <ul>
+                            <li><a href="#">Help Center</a></li>
+                            <li><a href="#">Case Studies</a></li>
+                            <li><a href="#">Blog</a></li>
+                            <li><a href="#">API Docs</a></li>
+                        </ul>
+                    </div>
+                </div>
+                <div className="footer-bottom">
+                    <p>© 2024 StockSense. All rights reserved. | Privacy Policy | Terms of Service</p>
+                </div>
+            </div>
+        </footer>
 
-         <View style={{height: 100}} /> 
-      </ScrollView>
+        {/* Chatbot Widget */}
+        <div className="chatbot-widget">
+            {!isChatbotOpen && <div className="chatbot-pulse"></div>}
+            <button 
+                className="chatbot-button" 
+                onClick={() => setIsChatbotOpen(!isChatbotOpen)}
+            >
+                <svg viewBox="0 0 24 24">
+                    <path d="M12 2C6.48 2 2 6.48 2 12C2 13.93 2.6 15.71 3.63 17.18L2 22L7.05 20.43C8.47 21.32 10.17 21.85 12 21.85C17.52 21.85 22 17.37 22 11.85C22 6.33 17.52 2 12 2ZM12 19.85C10.46 19.85 9 19.38 7.75 18.55L7.44 18.37L4.65 19.13L5.43 16.42L5.23 16.09C4.31 14.78 3.8 13.2 3.8 11.5C3.8 7.4 7.1 4.1 12 4.1C16.9 4.1 20.2 7.4 20.2 11.5C20.2 16.26 16.76 19.85 12 19.85Z"/>
+                    <circle cx="8" cy="12" r="1.5"/>
+                    <circle cx="12" cy="12" r="1.5"/>
+                    <circle cx="16" cy="12" r="1.5"/>
+                </svg>
+            </button>
 
-      {/* Floating Chatbot Button (Cosmetic) */}
-      <TouchableOpacity style={styles.chatbotBtn}>
-         <Ionicons name="chatbubble-ellipses" size={28} color="white" />
-      </TouchableOpacity>
-    </SafeAreaView>
+            <div className={`chatbot-window ${isChatbotOpen ? 'active' : ''}`}>
+                <div className="chatbot-header">
+                    <div className="chatbot-header-content">
+                        <div className="chatbot-avatar">🤖</div>
+                        <div className="chatbot-header-text">
+                            <h3>StockSense AI</h3>
+                            <p>Here to help you</p>
+                        </div>
+                    </div>
+                    <button className="chatbot-close" onClick={() => setIsChatbotOpen(false)}>×</button>
+                </div>
+
+                <div className="chatbot-messages">
+                    {messages.map((msg, index) => (
+                        <div key={index} className={`chatbot-message ${msg.isUser ? 'user' : 'bot'}`}>
+                            <div className="message-bubble">
+                                <SafeHTML html={msg.text} />
+                            </div>
+                        </div>
+                    ))}
+                    <div ref={messagesEndRef} />
+                </div>
+
+                <div className="chatbot-quick-replies">
+                    <button className="quick-reply-btn" onClick={() => handleQuickReply('How does the AI work?')}>How does AI work?</button>
+                    <button className="quick-reply-btn" onClick={() => handleQuickReply('Pricing info')}>Pricing</button>
+                    <button className="quick-reply-btn" onClick={() => handleQuickReply('Start free trial')}>Free trial</button>
+                </div>
+
+                <div className="chatbot-input-area">
+                    <input 
+                        type="text" 
+                        className="chatbot-input" 
+                        placeholder="Type your message..."
+                        value={inputValue}
+                        onChange={(e) => setInputValue(e.target.value)}
+                        onKeyPress={(e) => e.key === 'Enter' && handleSend()}
+                    />
+                    <button className="chatbot-send" onClick={handleSend}>
+                        <svg viewBox="0 0 24 24">
+                            <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: Colors.landing.white,
-  },
-  scrollContent: {
-    paddingTop: 80, // Space for fixed header
-  },
-  // Nav
-  nav: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    height: Platform.OS === 'ios' ? 100 : 80,
-    paddingTop: Platform.OS === 'ios' ? 40 : 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.95)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(52, 23, 85, 0.1)',
-    zIndex: 1000,
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 20,
-  },
-  navContainer: {
-    flex: 1,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    maxWidth: 1400,
-    alignSelf: 'center',
-  },
-  logoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  logoIcon: {
-    fontSize: 20,
-    color: Colors.landing.primaryPurple,
-    marginRight: 5,
-  },
-  logoText: {
-    fontSize: 22,
-    fontWeight: '800',
-    color: Colors.landing.primaryPurple,
-    letterSpacing: -0.5,
-  },
-  navActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  navLoginBtn: {
-    marginRight: 15,
-    padding: 8,
-  },
-  navLoginText: {
-    color: Colors.landing.black,
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  navCtaBtn: {
-    backgroundColor: Colors.landing.primaryPurple,
-    paddingVertical: 10,
-    paddingHorizontal: 18,
-    borderRadius: 8,
-  },
-  navCtaText: {
-    color: Colors.landing.white,
-    fontWeight: '600',
-    fontSize: 15,
-  },
-  // Hero
-  hero: {
-    padding: 20,
-    paddingTop: 40,
-    alignItems: 'center',
-  },
-  badge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: Colors.landing.lightPurple,
-    paddingVertical: 8,
-    paddingHorizontal: 16,
-    borderRadius: 50,
-    borderWidth: 1,
-    borderColor: 'rgba(52, 23, 85, 0.2)',
-    marginBottom: 20,
-  },
-  badgeIcon: {
-    color: Colors.landing.primaryPurple,
-    marginRight: 6,
-    fontSize: 12,
-  },
-  badgeText: {
-    color: Colors.landing.primaryPurple,
-    fontWeight: '600',
-    fontSize: 14,
-  },
-  heroTitle: {
-    fontSize: 42,
-    fontWeight: '800',
-    color: Colors.landing.black,
-    textAlign: 'center',
-    letterSpacing: -1,
-    lineHeight: 48,
-  },
-  heroTitleGradient: {
-    fontSize: 42,
-    fontWeight: '800',
-    color: Colors.landing.accentPurple, // Fallback for gradient
-    textAlign: 'center',
-    letterSpacing: -1,
-    lineHeight: 48,
-    marginBottom: 20,
-  },
-  heroDescription: {
-    fontSize: 18,
-    color: '#555',
-    textAlign: 'center',
-    lineHeight: 28,
-    maxWidth: 600,
-    marginBottom: 30,
-  },
-  heroButtons: {
-    flexDirection: 'column',
-    width: '100%',
-    gap: 15,
-    marginBottom: 50,
-    alignItems: 'center',
-  },
-  primaryBtn: {
-    backgroundColor: Colors.landing.primaryPurple,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    shadowColor: Colors.landing.primaryPurple,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 5,
-    minWidth: 200,
-    justifyContent: 'center',
-  },
-  primaryBtnText: {
-    color: Colors.landing.white,
-    fontSize: 18,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  secondaryBtn: {
-    backgroundColor: Colors.landing.white,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: '#E5E5E5',
-    minWidth: 200,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  secondaryBtnText: {
-    color: Colors.landing.black,
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  // Dashboard Preview
-  dashboardPreview: {
-    width: '100%',
-    maxWidth: 600,
-    backgroundColor: Colors.landing.white,
-    borderRadius: 20,
-    padding: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(52, 23, 85, 0.1)',
-    shadowColor: Colors.landing.primaryPurple,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 30,
-    elevation: 10,
-  },
-  dashboardHeader: {
-    flexDirection: 'row',
-    marginBottom: 20,
-    gap: 6,
-  },
-  dot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: Colors.landing.lightPurple,
-    borderWidth: 1,
-    borderColor: 'rgba(52, 23, 85, 0.2)',
-  },
-  dashboardContent: {
-    backgroundColor: Colors.landing.softPurple,
-    borderRadius: 16,
-    height: 200,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(52, 23, 85, 0.1)',
-  },
-  dashboardLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    color: Colors.landing.primaryPurple,
-    letterSpacing: 1.5,
-    marginBottom: 10,
-    textTransform: 'uppercase',
-  },
-  dashboardTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    color: Colors.landing.primaryPurple,
-  },
-  // Stats
-  statsSection: {
-    backgroundColor: Colors.landing.softPurple,
-    paddingVertical: 40,
-    paddingHorizontal: 20,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 15,
-    justifyContent: 'center',
-  },
-  statCard: {
-    backgroundColor: Colors.landing.white,
-    padding: 20,
-    borderRadius: 16,
-    width: '45%', // 2 per row
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: 'rgba(52, 23, 85, 0.1)',
-    minWidth: 140,
-  },
-  statValue: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.landing.primaryPurple,
-    marginBottom: 5,
-  },
-  statLabel: {
-    color: '#666',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-  // Features
-  featuresSection: {
-    padding: 20,
-    paddingVertical: 60,
-  },
-  sectionHeader: {
-    alignItems: 'center',
-    marginBottom: 40,
-  },
-  sectionTitle: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: Colors.landing.black,
-    textAlign: 'center',
-  },
-  sectionTitleGradient: {
-    fontSize: 32,
-    fontWeight: '800',
-    color: Colors.landing.accentPurple,
-    textAlign: 'center',
-    marginBottom: 10,
-  },
-  sectionDesc: {
-    fontSize: 16,
-    color: '#666',
-    textAlign: 'center',
-    lineHeight: 24,
-  },
-  featureShowcase: {
-    marginBottom: 60,
-  },
-  featureContent: {
-    marginBottom: 20,
-  },
-  featureTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    marginBottom: 10,
-    color: Colors.landing.black,
-  },
-  featureText: {
-    fontSize: 16,
-    color: '#666',
-    lineHeight: 24,
-    marginBottom: 15,
-  },
-  featureLink: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: Colors.landing.primaryPurple,
-  },
-  featureVisual: {
-    backgroundColor: Colors.landing.white,
-    borderWidth: 1,
-    borderColor: 'rgba(52, 23, 85, 0.1)',
-    borderRadius: 20,
-    height: 250,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: 'rgba(52, 23, 85, 0.5)',
-    shadowOffset: {width: 0, height: 5},
-    shadowOpacity: 0.1,
-    shadowRadius: 10,
-  },
-  featureIcon: {
-    fontSize: 50,
-    marginBottom: 10,
-    opacity: 0.5,
-  },
-  featureVisualLabel: {
-    fontSize: 20,
-    fontWeight: '700',
-    color: Colors.landing.primaryPurple,
-    opacity: 0.5,
-  },
-  // CTA
-  ctaSection: {
-    backgroundColor: Colors.landing.primaryPurple,
-    padding: 40,
-    alignItems: 'center',
-  },
-  ctaTitle: {
-    fontSize: 28,
-    fontWeight: '800',
-    color: Colors.landing.white,
-    textAlign: 'center',
-    marginBottom: 15,
-    lineHeight: 34,
-  },
-  ctaText: {
-    fontSize: 16,
-    color: 'rgba(255, 255, 255, 0.9)',
-    textAlign: 'center',
-    marginBottom: 30,
-    lineHeight: 24,
-  },
-  ctaBtn: {
-    backgroundColor: Colors.landing.white,
-    paddingVertical: 16,
-    paddingHorizontal: 32,
-    borderRadius: 12,
-  },
-  ctaBtnText: {
-    color: Colors.landing.primaryPurple,
-    fontSize: 18,
-    fontWeight: '600',
-  },
-  // Footer
-  footer: {
-    padding: 40,
-    backgroundColor: Colors.landing.white,
-    alignItems: 'center',
-    borderTopWidth: 1,
-    borderTopColor: 'rgba(52, 23, 85, 0.1)',
-  },
-  footerBrand: {
-    fontSize: 24,
-    fontWeight: '800',
-    color: Colors.landing.primaryPurple,
-    marginBottom: 10,
-  },
-  footerText: {
-    color: '#999',
-    fontSize: 12,
-  },
-  // Chatbot
-  chatbotBtn: {
-    position: 'absolute',
-    bottom: 30,
-    right: 30,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: Colors.landing.primaryPurple,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: Colors.landing.primaryPurple,
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.4,
-    shadowRadius: 10,
-    elevation: 8,
-  },
-});
 
 export default LandingPage;

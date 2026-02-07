@@ -49,7 +49,7 @@ export default function LoginScreen() {
         setIsLoading(true);
 
         try {
-            const response = await api.post('/login', { username: email, password });
+            const response = await api.post('/login', { email, password });
 
             if (response.data.access_token) {
                 await saveToken(response.data.access_token);

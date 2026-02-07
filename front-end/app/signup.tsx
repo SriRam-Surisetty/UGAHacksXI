@@ -30,7 +30,7 @@ export default function SignupScreen() {
                 await saveToken(response.data.access_token);
                 await saveUserId(username);
                 Alert.alert('Success', 'Account created successfully');
-                router.replace('/'); // Go to home
+                router.replace('/(tabs)'); // Go to main app
             }
         } catch (error: any) {
             Alert.alert('Signup Failed', error.response?.data?.msg || 'An error occurred');

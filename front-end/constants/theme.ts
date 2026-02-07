@@ -25,6 +25,15 @@ export const Colors = {
     tabIconDefault: '#9BA1A6',
     tabIconSelected: tintColorDark,
   },
+  // Custom Landing Page Colors
+  landing: {
+    primaryPurple: '#341755',
+    lightPurple: '#eaeaf4',
+    black: '#000000',
+    white: '#ffffff',
+    accentPurple: '#6b3fa0',
+    softPurple: '#f5f3f7',
+  }
 };
 
 export const Fonts = Platform.select({

@@ -23,7 +23,7 @@ export default function LoginScreen() {
                 await saveToken(response.data.access_token);
                 await saveUserId(username); // Using username as ID for this demo
                 Alert.alert('Success', 'Login Successful');
-                router.replace('/'); // Go to home
+                router.replace('/(tabs)'); // Go to main app
             }
         } catch (error: any) {
             Alert.alert('Login Failed', error.response?.data?.msg || 'An error occurred');

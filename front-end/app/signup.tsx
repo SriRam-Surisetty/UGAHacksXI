@@ -35,6 +35,7 @@ export default function SignupScreen() {
 
     const [termsAccepted, setTermsAccepted] = useState(false);
     const router = useRouter();
+    const [isLoading, setIsLoading] = useState(false);
 
     const showAlert = (title: string, message: string) => {
         if (Platform.OS === 'web' && typeof globalThis !== 'undefined' && 'alert' in globalThis) {
@@ -61,6 +62,12 @@ export default function SignupScreen() {
             return;
         }
 
+        if (isLoading) {
+            return;
+        }
+
+        setIsLoading(true);
+
         try {
             const response = await api.post('/signup', {
                 email,
@@ -76,6 +83,8 @@ export default function SignupScreen() {
             }
         } catch (error: any) {
             showAlert('Signup failed', error.response?.data?.msg || 'An error occurred');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -111,7 +120,10 @@ export default function SignupScreen() {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.mainContent}>
-                    <View style={styles.card}>
+                    <View
+                        style={[styles.card, isLoading && styles.cardDisabled]}
+                        pointerEvents={isLoading ? 'none' : 'auto'}
+                    >
                         <View style={styles.cardHeader}>
                             <Text style={styles.kicker}>Create account</Text>
                             <Text style={styles.title}>Set up your workspace.</Text>
@@ -130,6 +142,7 @@ export default function SignupScreen() {
                                     onChangeText={setEmail}
                                     autoCapitalize="none"
                                     keyboardType="email-address"
+                                    editable={!isLoading}
                                 />
                             </View>
 
@@ -142,6 +155,7 @@ export default function SignupScreen() {
                                         value={password}
                                         onChangeText={setPassword}
                                         secureTextEntry
+                                        editable={!isLoading}
                                     />
                                 </View>
                                 <View style={[styles.formGroup, styles.halfWidth]}>
@@ -152,6 +166,7 @@ export default function SignupScreen() {
                                         value={confirmPassword}
                                         onChangeText={setConfirmPassword}
                                         secureTextEntry
+                                        editable={!isLoading}
                                     />
                                 </View>
                             </View>
@@ -166,6 +181,7 @@ export default function SignupScreen() {
                                     placeholder="Your business name"
                                     value={orgName}
                                     onChangeText={setOrgName}
+                                    editable={!isLoading}
                                 />
                             </View>
 
@@ -176,6 +192,7 @@ export default function SignupScreen() {
                                     placeholder="Street address"
                                     value={address1}
                                     onChangeText={setAddress1}
+                                    editable={!isLoading}
                                 />
                             </View>
 
@@ -186,28 +203,49 @@ export default function SignupScreen() {
                                     placeholder="Suite, unit, or floor"
                                     value={address2}
                                     onChangeText={setAddress2}
+                                    editable={!isLoading}
                                 />
                             </View>
 
                             <View style={styles.formRow}>
                                 <View style={[styles.formGroup, styles.halfWidth]}>
                                     <Text style={styles.label}>City</Text>
-                                    <TextInput style={styles.input} value={city} onChangeText={setCity} />
+                                    <TextInput
+                                        style={styles.input}
+                                        value={city}
+                                        onChangeText={setCity}
+                                        editable={!isLoading}
+                                    />
                                 </View>
                                 <View style={[styles.formGroup, styles.halfWidth]}>
                                     <Text style={styles.label}>State</Text>
-                                    <TextInput style={styles.input} value={state} onChangeText={setState} />
+                                    <TextInput
+                                        style={styles.input}
+                                        value={state}
+                                        onChangeText={setState}
+                                        editable={!isLoading}
+                                    />
                                 </View>
                             </View>
 
                             <View style={styles.formRow}>
                                 <View style={[styles.formGroup, styles.halfWidth]}>
                                     <Text style={styles.label}>ZIP code</Text>
-                                    <TextInput style={styles.input} value={zipCode} onChangeText={setZipCode} />
+                                    <TextInput
+                                        style={styles.input}
+                                        value={zipCode}
+                                        onChangeText={setZipCode}
+                                        editable={!isLoading}
+                                    />
                                 </View>
                                 <View style={[styles.formGroup, styles.halfWidth]}>
                                     <Text style={styles.label}>Country</Text>
-                                    <TextInput style={styles.input} value={country} onChangeText={setCountry} />
+                                    <TextInput
+                                        style={styles.input}
+                                        value={country}
+                                        onChangeText={setCountry}
+                                        editable={!isLoading}
+                                    />
                                 </View>
                             </View>
                         </View>
@@ -215,6 +253,7 @@ export default function SignupScreen() {
                         <TouchableOpacity
                             style={styles.termsAgreement}
                             onPress={() => setTermsAccepted(!termsAccepted)}
+                            disabled={isLoading}
                         >
                             <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
                                 {termsAccepted && <Ionicons name="checkmark" size={12} color="white" />}
@@ -225,13 +264,13 @@ export default function SignupScreen() {
                             </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.btnPrimary} onPress={handleSignup}>
+                        <TouchableOpacity style={styles.btnPrimary} onPress={handleSignup} disabled={isLoading}>
                             <Text style={styles.btnPrimaryText}>Create account</Text>
                         </TouchableOpacity>
 
                         <View style={styles.inlineFooter}>
                             <Text style={styles.inlineText}>Already have an account?</Text>
-                            <TouchableOpacity onPress={navigateToLogin}>
+                            <TouchableOpacity onPress={navigateToLogin} disabled={isLoading}>
                                 <Text style={styles.inlineLink}>Sign in</Text>
                             </TouchableOpacity>
                         </View>
@@ -351,6 +390,9 @@ const styles = StyleSheet.create({
         borderWidth: 1,
         borderColor: 'rgba(52, 23, 85, 0.08)',
     },
+        cardDisabled: {
+            opacity: 0.6,
+        },
     cardHeader: {
         marginBottom: 24,
     },

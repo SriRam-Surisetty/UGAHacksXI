@@ -24,6 +24,7 @@ export default function LoginScreen() {
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
+    const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
 
     const showAlert = (title: string, message: string) => {
@@ -41,6 +42,12 @@ export default function LoginScreen() {
             return;
         }
 
+        if (isLoading) {
+            return;
+        }
+
+        setIsLoading(true);
+
         try {
             const response = await api.post('/login', { username: email, password });
 
@@ -52,6 +59,8 @@ export default function LoginScreen() {
             }
         } catch (error: any) {
             showAlert('Login failed', error.response?.data?.msg || 'An error occurred');
+        } finally {
+            setIsLoading(false);
         }
     };
 
@@ -91,7 +100,10 @@ export default function LoginScreen() {
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.mainContent}>
-                    <View style={styles.card}>
+                    <View
+                        style={[styles.card, isLoading && styles.cardDisabled]}
+                        pointerEvents={isLoading ? 'none' : 'auto'}
+                    >
                         <View style={styles.cardHeader}>
                             <Text style={styles.kicker}>Sign in</Text>
                             <Text style={styles.title}>Welcome back.</Text>
@@ -107,6 +119,7 @@ export default function LoginScreen() {
                                 onChangeText={setEmail}
                                 autoCapitalize="none"
                                 keyboardType="email-address"
+                                editable={!isLoading}
                             />
                         </View>
 
@@ -118,6 +131,7 @@ export default function LoginScreen() {
                                 value={password}
                                 onChangeText={setPassword}
                                 secureTextEntry
+                                editable={!isLoading}
                             />
                         </View>
 
@@ -125,24 +139,25 @@ export default function LoginScreen() {
                             <TouchableOpacity
                                 style={styles.rememberMe}
                                 onPress={() => setRememberMe(!rememberMe)}
+                                disabled={isLoading}
                             >
                                 <View style={[styles.checkbox, rememberMe && styles.checkboxChecked]}>
                                     {rememberMe && <Ionicons name="checkmark" size={12} color="white" />}
                                 </View>
                                 <Text style={styles.rememberLabel}>Remember me</Text>
                             </TouchableOpacity>
-                            <TouchableOpacity onPress={handleForgotPassword}>
+                            <TouchableOpacity onPress={handleForgotPassword} disabled={isLoading}>
                                 <Text style={styles.forgotPassword}>Forgot password?</Text>
                             </TouchableOpacity>
                         </View>
 
-                        <TouchableOpacity style={styles.btnPrimary} onPress={handleLogin}>
+                        <TouchableOpacity style={styles.btnPrimary} onPress={handleLogin} disabled={isLoading}>
                             <Text style={styles.btnPrimaryText}>Sign in</Text>
                         </TouchableOpacity>
 
                         <View style={styles.inlineFooter}>
                             <Text style={styles.inlineText}>New here?</Text>
-                            <TouchableOpacity onPress={navigateToSignup}>
+                            <TouchableOpacity onPress={navigateToSignup} disabled={isLoading}>
                                 <Text style={styles.inlineLink}>Create an account</Text>
                             </TouchableOpacity>
                         </View>
@@ -262,6 +277,9 @@ const styles = StyleSheet.create({
         elevation: 12,
         borderWidth: 1,
         borderColor: 'rgba(52, 23, 85, 0.08)',
+    },
+    cardDisabled: {
+        opacity: 0.6,
     },
     cardHeader: {
         marginBottom: 24,

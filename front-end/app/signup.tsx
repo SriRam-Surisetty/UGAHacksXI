@@ -46,12 +46,8 @@ export default function SignupScreen() {
         Alert.alert(title, message);
     };
 
-    const normalizeEmail = (value: string) => value.replace(/\s+/g, '').toLowerCase();
-
     const handleSignup = async () => {
-        const normalizedEmail = normalizeEmail(email);
-
-        if (!normalizedEmail || !password || !confirmPassword || !orgName || !address1 || !city || !state || !zipCode || !country) {
+        if (!email || !password || !confirmPassword || !orgName || !address1 || !city || !state || !zipCode || !country) {
             showAlert('Error', 'Please fill in all required fields');
             return;
         }
@@ -74,14 +70,14 @@ export default function SignupScreen() {
 
         try {
             const response = await api.post('/signup', {
-                email: normalizedEmail,
+                email,
                 password,
                 orgName,
             });
 
             if (response.data.access_token) {
                 await saveToken(response.data.access_token);
-                await saveUserId(normalizedEmail);
+                await saveUserId(email);
                 showAlert('Success', 'Account created successfully');
                 router.replace('/(tabs)');
             }
@@ -143,7 +139,7 @@ export default function SignupScreen() {
                                     style={styles.input}
                                     placeholder="you@company.com"
                                     value={email}
-                                    onChangeText={(text) => setEmail(normalizeEmail(text))}
+                                    onChangeText={setEmail}
                                     autoCapitalize="none"
                                     keyboardType="email-address"
                                     editable={!isLoading}

@@ -120,82 +120,6 @@ const LandingPage = () => {
             </div>
         </section>
 
-        {/* Stats Section */}
-        <section className="stats-section">
-            <div className="stats-container">
-                <div className="stats-grid">
-                    <div className="stat-card">
-                        <h3>40%</h3>
-                        <p>Waste Reduction</p>
-                    </div>
-                    <div className="stat-card">
-                        <h3>$15K</h3>
-                        <p>Monthly Savings</p>
-                    </div>
-                    <div className="stat-card">
-                        <h3>95%</h3>
-                        <p>AI Accuracy</p>
-                    </div>
-                    <div className="stat-card">
-                        <h3>2.5K+</h3>
-                        <p>Active Users</p>
-                    </div>
-                </div>
-            </div>
-        </section>
-
-        {/* Features Section */}
-        <section className="features">
-            <div className="features-container">
-                <div className="section-header">
-                    <h2>Advanced <span className="gradient-text">AI Intelligence</span></h2>
-                    <p>Neural networks and machine learning algorithms that continuously optimize your inventory in real-time.</p>
-                </div>
-
-                <div className="feature-showcase">
-                    <div className="feature-content">
-                        <h3>Predictive Forecasting</h3>
-                        <p>Advanced AI algorithms analyze millions of data points to predict stockouts with 95% accuracy. Make informed decisions before problems arise.</p>
-                        <Link href="/signup" className="btn-primary">Explore AI</Link>
-                    </div>
-                    <div className="feature-visual">
-                        <div className="feature-visual-content">
-                            <div className="feature-icon">🧠</div>
-                            <div className="feature-visual-label">Neural Network Analysis</div>
-                        </div>
-                    </div>
-                </div>
-
-                <div className="feature-showcase">
-                    <div className="feature-visual">
-                        <div className="feature-visual-content">
-                            <div className="feature-icon">⚡</div>
-                            <div className="feature-visual-label">Real-Time Synchronization</div>
-                        </div>
-                    </div>
-                    <div className="feature-content">
-                        <h3>Live Inventory Intelligence</h3>
-                        <p>Watch your inventory levels update instantly across all touchpoints. Real-time data synchronization ensures you're always informed.</p>
-                        <Link href="/signup" className="btn-primary">Start Tracking</Link>
-                    </div>
-                </div>
-
-                <div className="feature-showcase">
-                    <div className="feature-content">
-                        <h3>Smart Waste Detection</h3>
-                        <p>Machine learning identifies waste patterns and provides actionable recommendations. Turn insights into profit-driving decisions.</p>
-                        <Link href="/signup" className="btn-primary">View Analytics</Link>
-                    </div>
-                    <div className="feature-visual">
-                        <div className="feature-visual-content">
-                            <div className="feature-icon">📊</div>
-                            <div className="feature-visual-label">Pattern Recognition</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </section>
-
         {/* CTA Section */}
         <section className="cta-section">
             <div className="cta-container">
@@ -249,7 +173,6 @@ const LandingPage = () => {
 
         {/* Chatbot Widget */}
         <div className="chatbot-widget">
-            {!isChatbotOpen && <div className="chatbot-pulse"></div>}
             <button 
                 className="chatbot-button" 
                 onClick={() => setIsChatbotOpen(!isChatbotOpen)}

@@ -334,10 +334,6 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.landing.primaryPurple,
         borderRadius: 12,
         alignItems: 'center',
-        shadowColor: Colors.landing.primaryPurple,
-        shadowOffset: { width: 0, height: 10 },
-        shadowOpacity: 0.25,
-        shadowRadius: 20,
     },
     btnPrimaryText: {
         color: Colors.landing.white,

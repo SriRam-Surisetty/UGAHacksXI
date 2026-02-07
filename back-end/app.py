@@ -50,7 +50,7 @@ class Org(db.Model):
 class User(db.Model):
     __tablename__ = 'users'
     userID = db.Column(db.Integer, primary_key=True)
-    username = db.Column(db.String(50), unique=True, nullable=False)
+    email = db.Column(db.String(100), unique=True, nullable=False)
     hashed_pwd = db.Column(db.String(255), nullable=False)
     uRole = db.Column(db.String(20), default='user')
     orgID = db.Column(db.Integer, db.ForeignKey('orgs.orgID'))
@@ -66,7 +66,7 @@ def signup():
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
-        required_fields = ["orgName", "email", "username", "password"]
+        required_fields = ["orgName", "email", "password"]
         missing_fields = [field for field in required_fields if not data.get(field)]
         if missing_fields:
             return jsonify({"error": f"Missing fields: {', '.join(missing_fields)}"}), 400
@@ -77,7 +77,7 @@ def signup():
         db.session.flush()
 
         admin_user = User(
-            username=data.get("username"),
+            email=data.get("email"),
             hashed_pwd=generate_password_hash(data.get("password")),
             orgID=new_org.orgID,
             uRole='admin'
@@ -101,12 +101,12 @@ def login():
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
 
-        username = data.get("username")
+        email = data.get("email")
         password = data.get("password")
-        if not username or not password:
-            return jsonify({"error": "Missing username or password"}), 400
+        if not email or not password:
+            return jsonify({"error": "Missing email or password"}), 400
 
-        user = User.query.filter_by(username=username).first()
+        user = User.query.filter_by(email=email).first()
         if not user or not check_password_hash(user.hashed_pwd, password):
             return jsonify({"error": "Invalid credentials"}), 401
 

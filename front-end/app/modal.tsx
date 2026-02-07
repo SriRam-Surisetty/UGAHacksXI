@@ -1,5 +1,5 @@
 // @ts-ignore
-import { Link as NativeLink } from 'expo-router/build/link/Link';
+import { Link as NativeLink } from 'expo-router';
 
 // Cast Link to any to fix strict TS error "JSX element class does not support attributes"
 const Link = NativeLink as any;

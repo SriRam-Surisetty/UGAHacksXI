@@ -3,23 +3,15 @@ import {
     Alert,
     Dimensions,
     Platform,
-    SafeAreaView as NativeSafeAreaView,
-    ScrollView as NativeScrollView,
+    SafeAreaView,
+    ScrollView,
     StyleSheet,
-    Text as NativeText,
-    TextInput as NativeTextInput,
-    TouchableOpacity as NativeTouchableOpacity,
-    View as NativeView,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
-
-// Cast components to any to fix strict TS error "JSX element class does not support attributes"
-const View = NativeView as any;
-const SafeAreaView = NativeSafeAreaView as any;
-const ScrollView = NativeScrollView as any;
-const Text = NativeText as any;
-const TextInput = NativeTextInput as any;
-const TouchableOpacity = NativeTouchableOpacity as any;
-import { useRouter } from 'expo-router/build/hooks';
+import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
@@ -128,7 +120,7 @@ export default function LoginScreen() {
                                 style={styles.input}
                                 placeholder="you@company.com"
                                 value={email}
-                                onChangeText={(text: string) => setEmail(normalizeEmail(text))}
+                                onChangeText={(text) => setEmail(normalizeEmail(text))}
                                 autoCapitalize="none"
                                 keyboardType="email-address"
                                 editable={!isLoading}

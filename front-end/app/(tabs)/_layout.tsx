@@ -1,4 +1,4 @@
-import { Tabs as NativeTabs } from 'expo-router/build/layouts/Tabs';
+import { Tabs as NativeTabs } from 'expo-router';
 import React from 'react';
 
 // Cast Tabs to any to fix strict TS error "JSX element class does not support attributes"

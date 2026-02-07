@@ -1,7 +1,9 @@
 import { Image } from 'expo-image';
 import { Platform, StyleSheet, Button, View as NativeView } from 'react-native';
-import { useRouter } from 'expo-router/build/hooks';
-import { Link } from 'expo-router/build/link/Link';
+// @ts-ignore
+import { useRouter } from 'expo-router';
+// @ts-ignore
+import { Link } from 'expo-router';
 import { useState, useEffect } from 'react';
 
 // Cast View to any to fix strict TS error "JSX element class does not support attributes"

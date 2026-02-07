@@ -1,14 +1,15 @@
 import { useState } from 'react';
-import { 
-    StyleSheet, 
-    Text, 
-    View, 
-    TextInput, 
-    TouchableOpacity, 
-    Alert, 
-    ScrollView, 
-    SafeAreaView, 
-    Platform 
+import {
+    Alert,
+    Dimensions,
+    Platform,
+    SafeAreaView,
+    ScrollView,
+    StyleSheet,
+    Text,
+    TextInput,
+    TouchableOpacity,
+    View,
 } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -17,15 +18,15 @@ import { Colors } from '@/constants/theme';
 import api from '@/services/api';
 import { saveToken, saveUserId } from '@/services/storage';
 
+const { width } = Dimensions.get('window');
+
 export default function SignupScreen() {
-    // Personal Info
     const [firstName, setFirstName] = useState('');
     const [lastName, setLastName] = useState('');
     const [email, setEmail] = useState('');
     const [password, setPassword] = useState('');
     const [confirmPassword, setConfirmPassword] = useState('');
 
-    // Organization Info
     const [orgName, setOrgName] = useState('');
     const [address1, setAddress1] = useState('');
     const [address2, setAddress2] = useState('');
@@ -55,14 +56,11 @@ export default function SignupScreen() {
         }
 
         try {
-            // Mapping fields to backend expectation:
-            // username -> email (as discussed)
-            // orgName -> orgName
-            const response = await api.post('/signup', { 
-                username: email, 
+            const response = await api.post('/signup', {
+                username: email,
                 password,
                 orgName,
-                email // sending email as well for Org email
+                email,
             });
 
             if (response.data.access_token) {
@@ -72,7 +70,7 @@ export default function SignupScreen() {
                 router.replace('/(tabs)');
             }
         } catch (error: any) {
-            Alert.alert('Signup Failed', error.response?.data?.msg || 'An error occurred');
+            Alert.alert('Signup failed', error.response?.data?.msg || 'An error occurred');
         }
     };
 
@@ -87,62 +85,49 @@ export default function SignupScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
-            
-            {/* Background Decor */}
-            <View style={styles.purpleHeader} />
+            <View style={styles.backgroundBase}>
+                <View style={styles.orbTop} />
+                <View style={styles.orbBottom} />
+                <View style={styles.gridOverlay} />
+            </View>
 
-            {/* Navigation */}
             <View style={styles.nav}>
                 <View style={styles.navContainer}>
-                    <TouchableOpacity onPress={navigateToHome}>
+                    <TouchableOpacity onPress={navigateToHome} style={styles.logoWrap}>
+                        <View style={styles.logoMark} />
                         <Text style={styles.logo}>StockSense</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={navigateToHome} style={styles.backLink}>
-                        <Ionicons name="arrow-back" size={16} color="white" />
-                        <Text style={styles.backLinkText}>Back to home</Text>
+                        <Ionicons name="arrow-back" size={16} color={Colors.landing.white} />
+                        <Text style={styles.backLinkText}>Back</Text>
                     </TouchableOpacity>
                 </View>
             </View>
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Main Content */}
                 <View style={styles.mainContent}>
-                    <View style={styles.registerContainer}>
-                        <View style={styles.registerHeader}>
-                            <Text style={styles.title}>Create your account</Text>
-                            <View style={styles.subtitleContainer}>
-                                <Text style={styles.subtitle}>Already have an account? </Text>
-                                <TouchableOpacity onPress={navigateToLogin}>
-                                    <Text style={styles.linkText}>Sign in</Text>
-                                </TouchableOpacity>
-                            </View>
+                    <View style={styles.card}>
+                        <View style={styles.cardHeader}>
+                            <Text style={styles.kicker}>Create account</Text>
+                            <Text style={styles.title}>Set up your workspace.</Text>
+                            <Text style={styles.subtitle}>Tell us who you are and where you operate.</Text>
                         </View>
 
-                        {/* Personal Information */}
-                        <View style={styles.formSection}>
-                            <Text style={styles.sectionTitle}>Personal Information</Text>
-                            
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Account</Text>
                             <View style={styles.formRow}>
                                 <View style={[styles.formGroup, styles.halfWidth]}>
-                                    <Text style={styles.label}>First Name <Text style={styles.required}>*</Text></Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={firstName}
-                                        onChangeText={setFirstName}
-                                    />
+                                    <Text style={styles.label}>First name</Text>
+                                    <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} />
                                 </View>
                                 <View style={[styles.formGroup, styles.halfWidth]}>
-                                    <Text style={styles.label}>Last Name <Text style={styles.required}>*</Text></Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={lastName}
-                                        onChangeText={setLastName}
-                                    />
+                                    <Text style={styles.label}>Last name</Text>
+                                    <TextInput style={styles.input} value={lastName} onChangeText={setLastName} />
                                 </View>
                             </View>
 
                             <View style={styles.formGroup}>
-                                <Text style={styles.label}>Organization Email <Text style={styles.required}>*</Text></Text>
+                                <Text style={styles.label}>Admin email</Text>
                                 <TextInput
                                     style={styles.input}
                                     placeholder="you@company.com"
@@ -151,39 +136,36 @@ export default function SignupScreen() {
                                     autoCapitalize="none"
                                     keyboardType="email-address"
                                 />
-                                <Text style={styles.helperText}>Please use your organization email address</Text>
                             </View>
 
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Admin Password <Text style={styles.required}>*</Text></Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Create a strong password"
-                                    value={password}
-                                    onChangeText={setPassword}
-                                    secureTextEntry
-                                />
-                                <Text style={styles.helperText}>Minimum 8 characters, include uppercase, lowercase, and numbers</Text>
-                            </View>
-                            
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Confirm Admin Password <Text style={styles.required}>*</Text></Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="Re-enter your password"
-                                    value={confirmPassword}
-                                    onChangeText={setConfirmPassword}
-                                    secureTextEntry
-                                />
+                            <View style={styles.formRow}>
+                                <View style={[styles.formGroup, styles.halfWidth]}>
+                                    <Text style={styles.label}>Password</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Create a password"
+                                        value={password}
+                                        onChangeText={setPassword}
+                                        secureTextEntry
+                                    />
+                                </View>
+                                <View style={[styles.formGroup, styles.halfWidth]}>
+                                    <Text style={styles.label}>Confirm</Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        placeholder="Repeat password"
+                                        value={confirmPassword}
+                                        onChangeText={setConfirmPassword}
+                                        secureTextEntry
+                                    />
+                                </View>
                             </View>
                         </View>
 
-                        {/* Organization Information */}
-                        <View style={styles.formSection}>
-                            <Text style={styles.sectionTitle}>Organization Information</Text>
-
+                        <View style={styles.section}>
+                            <Text style={styles.sectionTitle}>Organization</Text>
                             <View style={styles.formGroup}>
-                                <Text style={styles.label}>Organization Name <Text style={styles.required}>*</Text></Text>
+                                <Text style={styles.label}>Organization name</Text>
                                 <TextInput
                                     style={styles.input}
                                     placeholder="Your business name"
@@ -193,7 +175,7 @@ export default function SignupScreen() {
                             </View>
 
                             <View style={styles.formGroup}>
-                                <Text style={styles.label}>Address Line 1 <Text style={styles.required}>*</Text></Text>
+                                <Text style={styles.label}>Address line 1</Text>
                                 <TextInput
                                     style={styles.input}
                                     placeholder="Street address"
@@ -203,10 +185,10 @@ export default function SignupScreen() {
                             </View>
 
                             <View style={styles.formGroup}>
-                                <Text style={styles.label}>Address Line 2</Text>
+                                <Text style={styles.label}>Address line 2</Text>
                                 <TextInput
                                     style={styles.input}
-                                    placeholder="Apartment, suite, unit, etc. (optional)"
+                                    placeholder="Suite, unit, or floor"
                                     value={address2}
                                     onChangeText={setAddress2}
                                 />
@@ -214,44 +196,28 @@ export default function SignupScreen() {
 
                             <View style={styles.formRow}>
                                 <View style={[styles.formGroup, styles.halfWidth]}>
-                                    <Text style={styles.label}>City <Text style={styles.required}>*</Text></Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={city}
-                                        onChangeText={setCity}
-                                    />
+                                    <Text style={styles.label}>City</Text>
+                                    <TextInput style={styles.input} value={city} onChangeText={setCity} />
                                 </View>
                                 <View style={[styles.formGroup, styles.halfWidth]}>
-                                    <Text style={styles.label}>State / Province <Text style={styles.required}>*</Text></Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={state}
-                                        onChangeText={setState}
-                                    />
+                                    <Text style={styles.label}>State</Text>
+                                    <TextInput style={styles.input} value={state} onChangeText={setState} />
                                 </View>
                             </View>
 
                             <View style={styles.formRow}>
                                 <View style={[styles.formGroup, styles.halfWidth]}>
-                                    <Text style={styles.label}>ZIP / Postal Code <Text style={styles.required}>*</Text></Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={zipCode}
-                                        onChangeText={setZipCode}
-                                    />
+                                    <Text style={styles.label}>ZIP code</Text>
+                                    <TextInput style={styles.input} value={zipCode} onChangeText={setZipCode} />
                                 </View>
                                 <View style={[styles.formGroup, styles.halfWidth]}>
-                                    <Text style={styles.label}>Country <Text style={styles.required}>*</Text></Text>
-                                    <TextInput
-                                        style={styles.input}
-                                        value={country}
-                                        onChangeText={setCountry}
-                                    />
+                                    <Text style={styles.label}>Country</Text>
+                                    <TextInput style={styles.input} value={country} onChangeText={setCountry} />
                                 </View>
                             </View>
 
                             <View style={styles.formGroup}>
-                                <Text style={styles.label}>Phone Number <Text style={styles.required}>*</Text></Text>
+                                <Text style={styles.label}>Phone</Text>
                                 <TextInput
                                     style={styles.input}
                                     placeholder="(555) 123-4567"
@@ -262,60 +228,30 @@ export default function SignupScreen() {
                             </View>
                         </View>
 
-                        {/* Terms */}
-                        <TouchableOpacity 
-                            style={styles.termsAgreement} 
+                        <TouchableOpacity
+                            style={styles.termsAgreement}
                             onPress={() => setTermsAccepted(!termsAccepted)}
                         >
-                             <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
+                            <View style={[styles.checkbox, termsAccepted && styles.checkboxChecked]}>
                                 {termsAccepted && <Ionicons name="checkmark" size={12} color="white" />}
                             </View>
                             <Text style={styles.termsText}>
-                                I agree to the <Text style={styles.linkText}>Terms of Service</Text> and <Text style={styles.linkText}>Privacy Policy</Text>, and consent to receive emails about StockSense products and services.
+                                I agree to the <Text style={styles.linkText}>Terms of Service</Text> and{' '}
+                                <Text style={styles.linkText}>Privacy Policy</Text>.
                             </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity style={styles.btnRegister} onPress={handleSignup}>
-                            <Text style={styles.btnRegisterText}>Create Account</Text>
+                        <TouchableOpacity style={styles.btnPrimary} onPress={handleSignup}>
+                            <Text style={styles.btnPrimaryText}>Create account</Text>
                         </TouchableOpacity>
-                    </View>
-                </View>
 
-                {/* Benefits Section */}
-                <View style={styles.benefitsSection}>
-                    <View style={styles.benefitsContainer}>
-                        <Text style={styles.benefitsTitle}>What you'll get with StockSense</Text>
-                        <View style={styles.benefitsGrid}>
-                            <View style={styles.benefitItem}>
-                                <View style={styles.benefitIcon}>
-                                    <Text style={{fontSize: 24}}>📊</Text>
-                                </View>
-                                <Text style={styles.benefitHeading}>AI-Powered Insights</Text>
-                                <Text style={styles.benefitText}>Advanced predictive analytics that forecast stockouts and optimize reordering with 95% accuracy.</Text>
-                            </View>
-                            
-                            <View style={styles.benefitItem}>
-                                <View style={styles.benefitIcon}>
-                                    <Text style={{fontSize: 24}}>💰</Text>
-                                </View>
-                                <Text style={styles.benefitHeading}>Cost Savings</Text>
-                                <Text style={styles.benefitText}>Save an average of $15K monthly by reducing waste and optimizing inventory levels across your business.</Text>
-                            </View>
-
-                            <View style={styles.benefitItem}>
-                                <View style={styles.benefitIcon}>
-                                    <Text style={{fontSize: 24}}>🌱</Text>
-                                </View>
-                                <Text style={styles.benefitHeading}>Environmental Impact</Text>
-                                <Text style={styles.benefitText}>Reduce food waste by 40% and contribute to a sustainable future while improving your bottom line.</Text>
-                            </View>
+                        <View style={styles.inlineFooter}>
+                            <Text style={styles.inlineText}>Already have an account?</Text>
+                            <TouchableOpacity onPress={navigateToLogin}>
+                                <Text style={styles.inlineLink}>Sign in</Text>
+                            </TouchableOpacity>
                         </View>
                     </View>
-                </View>
-
-                {/* Footer */}
-                <View style={styles.footer}>
-                    <Text style={styles.footerText}>© 2026 StockSense. All rights reserved.</Text>
                 </View>
             </ScrollView>
         </SafeAreaView>
@@ -327,159 +263,187 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.landing.lightPurple,
     },
-    purpleHeader: {
+    backgroundBase: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: Colors.landing.lightPurple,
+    },
+    orbTop: {
+        position: 'absolute',
+        top: -width * 0.45,
+        right: -width * 0.2,
+        width: width * 1.0,
+        height: width * 1.0,
+        borderRadius: width * 0.5,
+        backgroundColor: Colors.landing.primaryPurple,
+        opacity: 0.9,
+    },
+    orbBottom: {
+        position: 'absolute',
+        bottom: -width * 0.3,
+        left: -width * 0.2,
+        width: width * 0.7,
+        height: width * 0.7,
+        borderRadius: width * 0.35,
+        backgroundColor: Colors.landing.accentPurple,
+        opacity: 0.2,
+    },
+    gridOverlay: {
+        ...StyleSheet.absoluteFillObject,
+        backgroundColor: 'transparent',
+        opacity: 0.06,
+        borderTopWidth: 1,
+        borderLeftWidth: 1,
+        borderColor: Colors.landing.primaryPurple,
+        transform: [{ rotate: '1deg' }],
+    },
+    nav: {
         position: 'absolute',
         top: 0,
         left: 0,
         right: 0,
-        height: 300,
-        backgroundColor: Colors.landing.primaryPurple,
-        zIndex: 0,
-    },
-    nav: {
-        paddingTop: Platform.OS === 'android' ? 40 : 10,
-        paddingBottom: 20,
-        zIndex: 10,
-        backgroundColor: Colors.landing.primaryPurple, 
+        height: Platform.OS === 'ios' ? 90 : 70,
+        paddingTop: Platform.OS === 'ios' ? 40 : 20,
+        zIndex: 100,
+        backgroundColor: 'transparent',
+        justifyContent: 'center',
     },
     navContainer: {
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 20,
-        maxWidth: 1400,
+        maxWidth: 1200,
         alignSelf: 'center',
         width: '100%',
     },
+    logoWrap: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+    },
+    logoMark: {
+        width: 14,
+        height: 14,
+        borderRadius: 4,
+        backgroundColor: Colors.landing.white,
+    },
     logo: {
-        fontSize: 24,
+        fontSize: 22,
         fontWeight: '700',
         color: Colors.landing.white,
     },
     backLink: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 5,
+        gap: 6,
     },
     backLinkText: {
         color: Colors.landing.white,
-        fontWeight: '500',
-        fontSize: 15,
+        fontWeight: '600',
+        fontSize: 14,
     },
     scrollContent: {
         flexGrow: 1,
+        paddingTop: Platform.OS === 'ios' ? 100 : 80,
+        paddingBottom: 40,
     },
     mainContent: {
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 20,
-        marginTop: 20,
-        marginBottom: 60,
-        zIndex: 1,
+        minHeight: 700,
     },
-    registerContainer: {
+    card: {
         width: '100%',
-        maxWidth: 600,
+        maxWidth: 620,
         backgroundColor: Colors.landing.white,
-        borderRadius: 12,
-        padding: 30,
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 10,
-        },
-        shadowOpacity: 0.15,
+        borderRadius: 20,
+        padding: 28,
+        shadowColor: '#111111',
+        shadowOffset: { width: 0, height: 20 },
+        shadowOpacity: 0.2,
         shadowRadius: 30,
-        elevation: 10,
+        elevation: 12,
         borderWidth: 1,
-        borderColor: 'rgba(0,0,0,0.05)',
+        borderColor: 'rgba(52, 23, 85, 0.08)',
     },
-    registerHeader: {
-        alignItems: 'center',
-        marginBottom: 30,
+    cardHeader: {
+        marginBottom: 24,
+    },
+    kicker: {
+        textTransform: 'uppercase',
+        letterSpacing: 2,
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.landing.accentPurple,
+        marginBottom: 10,
     },
     title: {
         fontSize: 28,
         fontWeight: '700',
         color: Colors.landing.black,
-        marginBottom: 10,
-        textAlign: 'center',
-    },
-    subtitleContainer: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'center',
+        marginBottom: 8,
     },
     subtitle: {
-        color: '#666',
-        fontSize: 16,
+        fontSize: 15,
+        color: '#4a4a4a',
     },
-    linkText: {
-        color: Colors.landing.primaryPurple,
-        fontWeight: '600',
-        fontSize: 16,
-    },
-    formSection: {
-        marginBottom: 30,
+    section: {
+        marginBottom: 20,
+        padding: 16,
+        borderRadius: 16,
+        backgroundColor: 'rgba(234, 234, 244, 0.5)',
+        borderWidth: 1,
+        borderColor: 'rgba(52, 23, 85, 0.08)',
     },
     sectionTitle: {
-        fontSize: 18,
-        fontWeight: '600',
+        fontSize: 16,
+        fontWeight: '700',
         color: Colors.landing.black,
-        marginBottom: 20,
-        paddingBottom: 10,
-        borderBottomWidth: 2,
-        borderBottomColor: Colors.landing.lightPurple,
+        marginBottom: 14,
     },
     formRow: {
         flexDirection: 'row',
-        gap: 15,
-        marginBottom: 5,
+        gap: 12,
+    },
+    formGroup: {
+        marginBottom: 14,
+        flex: 1,
     },
     halfWidth: {
         flex: 1,
     },
-    formGroup: {
-        marginBottom: 20,
-    },
     label: {
         marginBottom: 8,
         color: Colors.landing.black,
-        fontWeight: '500',
-        fontSize: 15,
-    },
-    required: {
-        color: '#e74c3c',
+        fontWeight: '600',
+        fontSize: 14,
     },
     input: {
         width: '100%',
         paddingVertical: 12,
-        paddingHorizontal: 15,
-        borderWidth: 2,
-        borderColor: '#e0e0e0',
-        borderRadius: 6,
+        paddingHorizontal: 14,
+        borderWidth: 1,
+        borderColor: 'rgba(52, 23, 85, 0.15)',
+        borderRadius: 12,
         fontSize: 16,
         backgroundColor: Colors.landing.white,
     },
-    helperText: {
-        fontSize: 13,
-        color: '#666',
-        marginTop: 5,
-    },
     termsAgreement: {
         flexDirection: 'row',
-        gap: 12,
-        marginBottom: 25,
-        // alignItems: 'flex-start',
+        alignItems: 'flex-start',
+        gap: 10,
+        marginBottom: 20,
     },
     checkbox: {
-        width: 20,
-        height: 20,
+        width: 18,
+        height: 18,
         borderWidth: 2,
-        borderColor: '#ccc',
-        borderRadius: 4,
+        borderColor: 'rgba(52, 23, 85, 0.3)',
+        borderRadius: 5,
         alignItems: 'center',
         justifyContent: 'center',
+        backgroundColor: Colors.landing.white,
         marginTop: 2,
     },
     checkboxChecked: {
@@ -487,82 +451,43 @@ const styles = StyleSheet.create({
         borderColor: Colors.landing.primaryPurple,
     },
     termsText: {
-        fontSize: 14,
-        color: '#666',
-        lineHeight: 22,
         flex: 1,
+        fontSize: 13,
+        color: '#4a4a4a',
     },
-    btnRegister: {
+    linkText: {
+        color: Colors.landing.primaryPurple,
+        fontWeight: '700',
+    },
+    btnPrimary: {
         width: '100%',
-        padding: 15,
+        paddingVertical: 14,
         backgroundColor: Colors.landing.primaryPurple,
-        borderRadius: 6,
+        borderRadius: 12,
         alignItems: 'center',
+        shadowColor: Colors.landing.primaryPurple,
+        shadowOffset: { width: 0, height: 10 },
+        shadowOpacity: 0.25,
+        shadowRadius: 20,
     },
-    btnRegisterText: {
+    btnPrimaryText: {
         color: Colors.landing.white,
         fontSize: 16,
-        fontWeight: '600',
-    },
-    benefitsSection: {
-        backgroundColor: Colors.landing.white,
-        paddingVertical: 60,
-        paddingHorizontal: 20,
-    },
-    benefitsContainer: {
-        maxWidth: 1200,
-        alignSelf: 'center',
-    },
-    benefitsTitle: {
-        fontSize: 32,
         fontWeight: '700',
-        color: Colors.landing.black,
-        textAlign: 'center',
-        marginBottom: 40,
     },
-    benefitsGrid: {
+    inlineFooter: {
         flexDirection: 'row',
-        flexWrap: 'wrap',
         justifyContent: 'center',
-        gap: 30,
+        gap: 6,
+        marginTop: 18,
     },
-    benefitItem: {
-        width: '30%',
-        minWidth: 280,
-        backgroundColor: Colors.landing.lightPurple,
-        padding: 30,
-        borderRadius: 8,
-        alignItems: 'center',
+    inlineText: {
+        color: '#4a4a4a',
+        fontSize: 14,
     },
-    benefitIcon: {
-        width: 60,
-        height: 60,
-        backgroundColor: Colors.landing.primaryPurple,
-        borderRadius: 30,
-        alignItems: 'center',
-        justifyContent: 'center',
-        marginBottom: 20,
-    },
-    benefitHeading: {
-        fontSize: 20,
-        fontWeight: '600',
-        color: Colors.landing.black,
-        marginBottom: 10,
-        textAlign: 'center',
-    },
-    benefitText: {
-        color: '#555',
-        lineHeight: 24,
-        textAlign: 'center',
-        fontSize: 15,
-    },
-    footer: {
-        backgroundColor: Colors.landing.black,
-        padding: 20,
-        alignItems: 'center',
-    },
-    footerText: {
-        color: '#666',
+    inlineLink: {
+        color: Colors.landing.primaryPurple,
+        fontWeight: '700',
         fontSize: 14,
     },
 });

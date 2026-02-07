@@ -33,6 +33,13 @@ export default function TabLayout() {
           tabBarIcon: ({ color }: { color: string }) => <IconSymbol size={28} name="paperplane.fill" color={color} />,
         }}
       />
+      <Tabs.Screen
+        name="chatbot"
+        options={{
+          title: 'Chatbot',
+          tabBarIcon: ({ color }: { color: string }) => <IconSymbol size={28} name="message.fill" color={color} />,
+        }}
+      />
     </Tabs>
   );
 }

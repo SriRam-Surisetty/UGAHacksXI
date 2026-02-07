@@ -146,7 +146,7 @@ def chat():
             return jsonify({"error": "Server configuration error: API key missing"}), 500
 
         genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')
+        model = genai.GenerativeModel('gemini-flash-latest')
         
         chat = model.start_chat(history=[])
         response = chat.send_message(message)

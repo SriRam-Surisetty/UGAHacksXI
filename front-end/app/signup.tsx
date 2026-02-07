@@ -114,16 +114,6 @@ export default function SignupScreen() {
 
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Account</Text>
-                            <View style={styles.formRow}>
-                                <View style={[styles.formGroup, styles.halfWidth]}>
-                                    <Text style={styles.label}>First name</Text>
-                                    <TextInput style={styles.input} value={firstName} onChangeText={setFirstName} />
-                                </View>
-                                <View style={[styles.formGroup, styles.halfWidth]}>
-                                    <Text style={styles.label}>Last name</Text>
-                                    <TextInput style={styles.input} value={lastName} onChangeText={setLastName} />
-                                </View>
-                            </View>
 
                             <View style={styles.formGroup}>
                                 <Text style={styles.label}>Admin email</Text>
@@ -213,17 +203,6 @@ export default function SignupScreen() {
                                     <Text style={styles.label}>Country</Text>
                                     <TextInput style={styles.input} value={country} onChangeText={setCountry} />
                                 </View>
-                            </View>
-
-                            <View style={styles.formGroup}>
-                                <Text style={styles.label}>Phone</Text>
-                                <TextInput
-                                    style={styles.input}
-                                    placeholder="(555) 123-4567"
-                                    value={phone}
-                                    onChangeText={setPhone}
-                                    keyboardType="phone-pad"
-                                />
                             </View>
                         </View>
 

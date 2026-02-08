@@ -13,7 +13,7 @@ module.exports = {
         'soft-purple': '#f5f3f7',
       },
       fontFamily: {
-        'sans': ['Inter', 'sans-serif'],
+        'sans': ['IBM Plex Sans', 'sans-serif'],
         'display': ['Space Grotesk', 'sans-serif'],
       }
     },

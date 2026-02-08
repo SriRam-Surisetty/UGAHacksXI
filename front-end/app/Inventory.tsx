@@ -369,7 +369,7 @@ export default function Inventory() {
 	return (
 		<SafeAreaView style={styles.container}>
 			<StatusBar style="dark" />
-			<AuthHeader activeRoute="/Inventory" />
+			<AuthHeader activeRoute="/Inventory" onChatPress={() => setIsChatOpen(true)} />
 			<ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
 				<View style={styles.contentWrapper}>
 					<View style={styles.headerRow}>

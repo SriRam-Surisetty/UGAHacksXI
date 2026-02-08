@@ -585,12 +585,14 @@ const styles = StyleSheet.create({
         gap: 12,
         marginBottom: 16,
         flexWrap: 'wrap',
+        zIndex: 20,
+        position: 'relative',
     },
     filterGroup: {
         flex: 1,
         minWidth: 140,
         position: 'relative',
-        zIndex: 10,
+        zIndex: 20,
     },
     filterLabel: {
         fontSize: 12,

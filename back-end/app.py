@@ -246,16 +246,27 @@ def signup():
         if full_address:
             try:
                 geo_key = os.getenv("GEOCODING_API_KEY", "")
-                geo_resp = http_requests.get(
-                    "https://geocode.maps.co/search",
-                    params={"q": full_address, "api_key": geo_key},
-                    timeout=10,
-                )
-                geo_data = geo_resp.json()
-                if geo_data and len(geo_data) > 0:
-                    lat = float(geo_data[0]["lat"])
-                    lon = float(geo_data[0]["lon"])
-                    app.logger.info("Geocoded '%s' -> (%s, %s)", full_address, lat, lon)
+                # Try full address first, then fall back to city/state/zip
+                queries = [full_address]
+                fallback_parts = [data.get("city", ""), data.get("state", ""),
+                                  data.get("zipCode", ""), data.get("country", "")]
+                fallback = ", ".join(p for p in fallback_parts if p)
+                if fallback and fallback != full_address:
+                    queries.append(fallback)
+
+                for q in queries:
+                    geo_resp = http_requests.get(
+                        "https://geocode.maps.co/search",
+                        params={"q": q, "api_key": geo_key},
+                        timeout=10,
+                    )
+                    geo_data = geo_resp.json()
+                    app.logger.debug("Geocode query='%s' results=%d", q, len(geo_data) if isinstance(geo_data, list) else 0)
+                    if isinstance(geo_data, list) and len(geo_data) > 0:
+                        lat = float(geo_data[0]["lat"])
+                        lon = float(geo_data[0]["lon"])
+                        app.logger.info("Geocoded '%s' -> (%s, %s)", q, lat, lon)
+                        break
             except Exception:
                 app.logger.warning("Geocoding failed for '%s', continuing without coords", full_address)
 
@@ -519,23 +530,40 @@ def manage_org():
                          data.get("country", "")]
         full_address = ", ".join(p for p in address_parts if p)
         if full_address:
+            lat, lon = None, None
             try:
                 geo_key = os.getenv("GEOCODING_API_KEY", "")
-                geo_resp = http_requests.get(
-                    "https://geocode.maps.co/search",
-                    params={"q": full_address, "api_key": geo_key},
-                    timeout=10,
-                )
-                geo_data = geo_resp.json()
-                if geo_data and len(geo_data) > 0:
-                    new_lat = float(geo_data[0]["lat"])
-                    new_lon = float(geo_data[0]["lon"])
+                # Try full address first, then fall back to city/state/zip
+                queries = [full_address]
+                fallback_parts = [data.get("city", ""), data.get("state", ""),
+                                  data.get("zipCode", ""), data.get("country", "")]
+                fallback = ", ".join(p for p in fallback_parts if p)
+                if fallback and fallback != full_address:
+                    queries.append(fallback)
+
+                for q in queries:
+                    geo_resp = http_requests.get(
+                        "https://geocode.maps.co/search",
+                        params={"q": q, "api_key": geo_key},
+                        timeout=10,
+                    )
+                    geo_data = geo_resp.json()
+                    app.logger.debug("Geocode query='%s' results=%d", q, len(geo_data) if isinstance(geo_data, list) else 0)
+                    if isinstance(geo_data, list) and len(geo_data) > 0:
+                        lat = float(geo_data[0]["lat"])
+                        lon = float(geo_data[0]["lon"])
+                        app.logger.info("Geocoded '%s' -> (%s, %s)", q, lat, lon)
+                        break
+
+                if lat is not None and lon is not None:
                     changes["location"] = {
                         "from": f"{org.latCoord}, {org.longCoord}",
-                        "to": f"{new_lat}, {new_lon}",
+                        "to": f"{lat}, {lon}",
                     }
-                    org.latCoord = new_lat
-                    org.longCoord = new_lon
+                    org.latCoord = lat
+                    org.longCoord = lon
+                else:
+                    app.logger.warning("Geocoding returned no results for '%s'", full_address)
             except Exception:
                 app.logger.warning("Geocoding failed during org update")
 
@@ -2580,13 +2608,18 @@ def nearby_food_resources():
         url = f"https://www.usdalocalfoodportal.com/api/{directory}/"
         app.logger.info("USDA API request: %s params=%s", url, params)
 
-        resp = http_requests.get(url, params=params, timeout=15)
+        resp = http_requests.get(url, params=params, timeout=15,
+                                 headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko)"})
 
         if resp.status_code != 200:
             app.logger.warning("USDA API returned %s: %s", resp.status_code, resp.text[:500])
             return jsonify({"error": "USDA API error", "status": resp.status_code}), 502
 
         data = resp.json() if resp.text.strip() else []
+
+        # The USDA API wraps results in {"data": [...]}
+        if isinstance(data, dict) and "data" in data:
+            data = data["data"]
 
         # Normalize if the API returns something unexpected
         if not isinstance(data, list):

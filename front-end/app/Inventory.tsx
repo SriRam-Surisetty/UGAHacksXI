@@ -1,69 +1,71 @@
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
+import ChatWidget from '@/components/ChatWidget';
 
 type Dish = {
-    id: number;
-    name: string;
-    category: string;
-    lastUpdated: string;
-    usageCount: number;
+	id: number;
+	name: string;
+	category: string;
+	lastUpdated: string;
+	usageCount: number;
 };
 
 type Ingredient = {
-    id: number;
-    name: string;
-    category: string;
-    unit: string;
-    lastUpdated: string;
-    usageCount: number;
+	id: number;
+	name: string;
+	category: string;
+	unit: string;
+	lastUpdated: string;
+	usageCount: number;
 };
 
 type TabKey = 'dishes' | 'ingredients';
 
 const dishes: Dish[] = [
-    { id: 101, name: 'Margherita Pizza', category: 'Main Course', lastUpdated: '2024-02-01', usageCount: 450 },
-    { id: 102, name: 'Caprese Salad', category: 'Appetizer', lastUpdated: '2024-02-03', usageCount: 120 },
-    { id: 103, name: 'Tomato Bruschetta', category: 'Appetizer', lastUpdated: '2024-02-05', usageCount: 85 },
+	{ id: 101, name: 'Margherita Pizza', category: 'Main Course', lastUpdated: '2024-02-01', usageCount: 450 },
+	{ id: 102, name: 'Caprese Salad', category: 'Appetizer', lastUpdated: '2024-02-03', usageCount: 120 },
+	{ id: 103, name: 'Tomato Bruschetta', category: 'Appetizer', lastUpdated: '2024-02-05', usageCount: 85 },
 ];
 
 const ingredients: Ingredient[] = [
-    { id: 1, name: 'Roma Tomatoes', category: 'Produce', unit: 'kg', lastUpdated: '2024-02-05', usageCount: 12 },
-    { id: 2, name: 'Buffalo Mozzarella', category: 'Dairy', unit: 'kg', lastUpdated: '2024-02-06', usageCount: 8 },
-    { id: 3, name: 'Fresh Basil', category: 'Produce', unit: 'kg', lastUpdated: '2024-02-07', usageCount: 15 },
-    { id: 4, name: 'Extra Virgin Olive Oil', category: 'Pantry', unit: 'L', lastUpdated: '2024-01-20', usageCount: 22 },
-    { id: 5, name: 'Double Zero Flour', category: 'Pantry', unit: 'kg', lastUpdated: '2024-02-01', usageCount: 30 },
+	{ id: 1, name: 'Roma Tomatoes', category: 'Produce', unit: 'kg', lastUpdated: '2024-02-05', usageCount: 12 },
+	{ id: 2, name: 'Buffalo Mozzarella', category: 'Dairy', unit: 'kg', lastUpdated: '2024-02-06', usageCount: 8 },
+	{ id: 3, name: 'Fresh Basil', category: 'Produce', unit: 'kg', lastUpdated: '2024-02-07', usageCount: 15 },
+	{ id: 4, name: 'Extra Virgin Olive Oil', category: 'Pantry', unit: 'L', lastUpdated: '2024-01-20', usageCount: 22 },
+	{ id: 5, name: 'Double Zero Flour', category: 'Pantry', unit: 'kg', lastUpdated: '2024-02-01', usageCount: 30 },
 ];
 
 export default function Inventory() {
-    const [activeTab, setActiveTab] = useState<TabKey>('dishes');
-    const [search, setSearch] = useState('');
+	const [activeTab, setActiveTab] = useState<TabKey>('dishes');
+	const [search, setSearch] = useState('');
+	const [isChatOpen, setIsChatOpen] = useState(false);
 
-    const filteredDishes = useMemo(() => {
-        const needle = search.trim().toLowerCase();
-        if (!needle) return dishes;
-        return dishes.filter((dish) => dish.name.toLowerCase().includes(needle));
-    }, [search]);
+	const filteredDishes = useMemo(() => {
+		const needle = search.trim().toLowerCase();
+		if (!needle) return dishes;
+		return dishes.filter((dish) => dish.name.toLowerCase().includes(needle));
+	}, [search]);
 
-    const filteredIngredients = useMemo(() => {
-        const needle = search.trim().toLowerCase();
-        if (!needle) return ingredients;
-        return ingredients.filter((ingredient) => ingredient.name.toLowerCase().includes(needle));
-    }, [search]);
+	const filteredIngredients = useMemo(() => {
+		const needle = search.trim().toLowerCase();
+		if (!needle) return ingredients;
+		return ingredients.filter((ingredient) => ingredient.name.toLowerCase().includes(needle));
+	}, [search]);
 
-    const tableHeaders = activeTab === 'dishes'
-        ? ['Dish Name', 'Category', 'Popularity (Monthly)', 'Last Modified']
-        : ['Ingredient Name', 'Category', 'Base Unit', 'Linked Dishes'];
+	const tableHeaders = activeTab === 'dishes'
+		? ['Dish Name', 'Category', 'Popularity (Monthly)', 'Last Modified']
+		: ['Ingredient Name', 'Category', 'Base Unit', 'Linked Dishes'];
 
-    const addLabel = activeTab === 'dishes' ? 'Add Dish' : 'Add Ingredient';
-    const tableRows = activeTab === 'dishes' ? filteredDishes : filteredIngredients;
+	const addLabel = activeTab === 'dishes' ? 'Add Dish' : 'Add Ingredient';
+	const tableRows = activeTab === 'dishes' ? filteredDishes : filteredIngredients;
 
 	return (
 		<SafeAreaView style={styles.container}>
 			<StatusBar style="dark" />
-			<AuthHeader activeRoute="/Inventory" />
+			<AuthHeader activeRoute="/Inventory" onChatPress={() => setIsChatOpen(true)} />
 			<ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
 				<View style={styles.contentWrapper}>
 					<View style={styles.headerRow}>
@@ -150,6 +152,9 @@ export default function Inventory() {
 					</View>
 				</View>
 			</ScrollView>
+
+			{/* Floating Chat Widget */}
+			<ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
 		</SafeAreaView>
 	);
 }
@@ -338,5 +343,5 @@ const styles = StyleSheet.create({
 		borderRadius: 8,
 		backgroundColor: '#f3f4f6',
 	},
-	},
+},
 );

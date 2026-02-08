@@ -12,18 +12,19 @@ const fontFamilies = {
 
 type AuthHeaderProps = {
     activeRoute?: string;
+    onChatPress?: () => void;
 };
 
 const navItems = [
     { label: 'Dashboard', route: '/Dashboard' },
     { label: 'Stock', route: '/Stock' },
     { label: 'Inventory', route: '/Inventory' },
-    { label: 'Chat', route: '/(tabs)/chatbot' },
+    { label: 'Chat', route: null }, // Chat uses popup instead of navigation
     { label: 'Support', route: '/Support' },
     { label: 'Users', route: '/Users' },
 ];
 
-export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
+export default function AuthHeader({ activeRoute, onChatPress }: AuthHeaderProps) {
     const router = useRouter();
 
     const handleLogout = async () => {
@@ -32,6 +33,14 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
             await deleteUserId();
         } finally {
             router.replace('/login');
+        }
+    };
+
+    const handleNavPress = (item: typeof navItems[0]) => {
+        if (item.label === 'Chat' && onChatPress) {
+            onChatPress();
+        } else if (item.route) {
+            router.push(item.route);
         }
     };
 
@@ -44,7 +53,7 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
                         {navItems.map((item) => {
                             const isActive = activeRoute === item.route;
                             return (
-                                <TouchableOpacity key={item.route} onPress={() => router.push(item.route)}>
+                                <TouchableOpacity key={item.label} onPress={() => handleNavPress(item)}>
                                     <Text style={[styles.navText, isActive && styles.navTextActive]}>{item.label}</Text>
                                 </TouchableOpacity>
                             );
@@ -104,7 +113,6 @@ const styles = StyleSheet.create({
     },
     navText: {
         fontFamily: fontFamilies.bold,
-        fontWeight: '700',
         color: '#6b7280',
         fontWeight: '600',
     },

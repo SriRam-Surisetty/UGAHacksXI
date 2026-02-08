@@ -1,18 +1,21 @@
+import React, { useState } from 'react';
 import { Dimensions, Platform, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
+import ChatWidget from '@/components/ChatWidget';
 
 const { width } = Dimensions.get('window');
 
 export default function Dashboard() {
 	const isWide = width >= 900;
 	const isMid = width >= 720;
+	const [isChatOpen, setIsChatOpen] = useState(false);
 
 	return (
 		<SafeAreaView style={styles.container}>
 			<StatusBar style="dark" />
-			<AuthHeader activeRoute="/Dashboard" />
+			<AuthHeader activeRoute="/Dashboard" onChatPress={() => setIsChatOpen(true)} />
 
 			<ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
 				<View style={styles.contentWrapper}>
@@ -22,155 +25,158 @@ export default function Dashboard() {
 					</View>
 
 					<View style={[styles.primaryGrid, isMid && styles.primaryGridWide]}>
-					<View style={styles.cardShell}>
-						<View style={styles.cardHeader}>
-							<View style={styles.cardHeaderLeft}>
-								<View style={styles.alertDot} />
-								<Text style={styles.cardHeaderTitle}>Use Now: Expiring Batches</Text>
+						<View style={styles.cardShell}>
+							<View style={styles.cardHeader}>
+								<View style={styles.cardHeaderLeft}>
+									<View style={styles.alertDot} />
+									<Text style={styles.cardHeaderTitle}>Use Now: Expiring Batches</Text>
+								</View>
+								<Text style={styles.cardHeaderLink}>Manage Inventory</Text>
 							</View>
-							<Text style={styles.cardHeaderLink}>Manage Inventory</Text>
+							<View style={styles.cardBody}>
+								<View style={styles.rowBetween}>
+									<View>
+										<Text style={styles.itemTitle}>Fresh Basil Leaves</Text>
+										<Text style={styles.itemMeta}>
+											1.5 kg remaining • <Text style={styles.itemMetaStrong}>Batch #BTH-082</Text>
+										</Text>
+									</View>
+									<View style={[styles.badge, styles.badgeDanger]}>
+										<Text style={[styles.badgeText, styles.badgeTextDanger]}>18 Hours Left</Text>
+									</View>
+								</View>
+								<View style={styles.divider} />
+								<View style={styles.rowBetween}>
+									<View>
+										<Text style={styles.itemTitle}>Buffalo Mozzarella</Text>
+										<Text style={styles.itemMeta}>
+											12.0 kg remaining • <Text style={styles.itemMetaStrong}>Batch #BTH-002</Text>
+										</Text>
+									</View>
+									<View style={[styles.badge, styles.badgeWarning]}>
+										<Text style={[styles.badgeText, styles.badgeTextWarning]}>2 Days Left</Text>
+									</View>
+								</View>
+							</View>
 						</View>
-						<View style={styles.cardBody}>
-							<View style={styles.rowBetween}>
-								<View>
-									<Text style={styles.itemTitle}>Fresh Basil Leaves</Text>
-									<Text style={styles.itemMeta}>
-										1.5 kg remaining • <Text style={styles.itemMetaStrong}>Batch #BTH-082</Text>
-									</Text>
-								</View>
-								<View style={[styles.badge, styles.badgeDanger]}>
-									<Text style={[styles.badgeText, styles.badgeTextDanger]}>18 Hours Left</Text>
-								</View>
-							</View>
-							<View style={styles.divider} />
-							<View style={styles.rowBetween}>
-								<View>
-									<Text style={styles.itemTitle}>Buffalo Mozzarella</Text>
-									<Text style={styles.itemMeta}>
-										12.0 kg remaining • <Text style={styles.itemMetaStrong}>Batch #BTH-002</Text>
-									</Text>
-								</View>
-								<View style={[styles.badge, styles.badgeWarning]}>
-									<Text style={[styles.badgeText, styles.badgeTextWarning]}>2 Days Left</Text>
-								</View>
-							</View>
-						</View>
-					</View>
 
-					<View style={styles.cardShell}>
-						<View style={styles.cardHeader}>
-							<View style={styles.cardHeaderLeft}>
-								<View style={styles.iconCircle} />
-								<Text style={styles.cardHeaderTitle}>Restock: Low Inventory</Text>
+						<View style={styles.cardShell}>
+							<View style={styles.cardHeader}>
+								<View style={styles.cardHeaderLeft}>
+									<View style={styles.iconCircle} />
+									<Text style={styles.cardHeaderTitle}>Restock: Low Inventory</Text>
+								</View>
+								<Text style={styles.cardHeaderLink}>Update Stock</Text>
 							</View>
-							<Text style={styles.cardHeaderLink}>Update Stock</Text>
+							<View style={styles.cardBody}>
+								<View style={styles.rowBetween}>
+									<View>
+										<Text style={styles.itemTitle}>Double Zero Flour</Text>
+										<Text style={styles.itemMeta}>
+											12.0 kg left • <Text style={styles.itemMetaMuted}>Needs 38.0 kg</Text>
+										</Text>
+									</View>
+									<View style={[styles.badge, styles.badgeDangerPlain]}>
+										<Text style={[styles.badgeText, styles.badgeTextDanger]}>Critical</Text>
+									</View>
+								</View>
+								<View style={styles.divider} />
+								<View style={styles.rowBetween}>
+									<View>
+										<Text style={styles.itemTitle}>Extra Virgin Olive Oil</Text>
+										<Text style={styles.itemMeta}>
+											4.0 L left • <Text style={styles.itemMetaMuted}>Needs 6.0 L</Text>
+										</Text>
+									</View>
+									<View style={[styles.badge, styles.badgeWarning]}>
+										<Text style={[styles.badgeText, styles.badgeTextWarning]}>Warning</Text>
+									</View>
+								</View>
+							</View>
 						</View>
-						<View style={styles.cardBody}>
-							<View style={styles.rowBetween}>
-								<View>
-									<Text style={styles.itemTitle}>Double Zero Flour</Text>
-									<Text style={styles.itemMeta}>
-										12.0 kg left • <Text style={styles.itemMetaMuted}>Needs 38.0 kg</Text>
-									</Text>
-								</View>
-								<View style={[styles.badge, styles.badgeDangerPlain]}>
-									<Text style={[styles.badgeText, styles.badgeTextDanger]}>Critical</Text>
-								</View>
-							</View>
-							<View style={styles.divider} />
-							<View style={styles.rowBetween}>
-								<View>
-									<Text style={styles.itemTitle}>Extra Virgin Olive Oil</Text>
-									<Text style={styles.itemMeta}>
-										4.0 L left • <Text style={styles.itemMetaMuted}>Needs 6.0 L</Text>
-									</Text>
-								</View>
-								<View style={[styles.badge, styles.badgeWarning]}>
-									<Text style={[styles.badgeText, styles.badgeTextWarning]}>Warning</Text>
-								</View>
-							</View>
-						</View>
-					</View>
 					</View>
 
 					<View style={[styles.secondaryGrid, isWide && styles.secondaryGridWide]}>
-					<View style={[styles.cardShell, styles.cardLarge]}> 
-						<View style={styles.cardHeader}>
-							<Text style={styles.cardHeaderTitle}>Local Demand Signals</Text>
-							<View style={styles.headerChip}>
-								<View style={styles.statusDot} />
-								<Text style={styles.headerChipText}>Athens, GA Feed</Text>
+						<View style={[styles.cardShell, styles.cardLarge]}>
+							<View style={styles.cardHeader}>
+								<Text style={styles.cardHeaderTitle}>Local Demand Signals</Text>
+								<View style={styles.headerChip}>
+									<View style={styles.statusDot} />
+									<Text style={styles.headerChipText}>Athens, GA Feed</Text>
+								</View>
 							</View>
-						</View>
-						<View style={styles.cardBody}>
-							<View style={styles.demandItem}>
-								<View style={styles.demandHeader}>
-									<Text style={styles.demandTitle}>UGA Football Game Day</Text>
-									<View style={styles.demandBadgeDark}>
-										<Text style={styles.demandBadgeDarkText}>Extreme Traffic</Text>
+							<View style={styles.cardBody}>
+								<View style={styles.demandItem}>
+									<View style={styles.demandHeader}>
+										<Text style={styles.demandTitle}>UGA Football Game Day</Text>
+										<View style={styles.demandBadgeDark}>
+											<Text style={styles.demandBadgeDarkText}>Extreme Traffic</Text>
+										</View>
+									</View>
+									<Text style={styles.demandBody}>
+										Tomorrow • 12:00 PM • 2.5 mi away. Expected 80,000+ fans. High demand for finger foods predicted.
+									</Text>
+									<View style={styles.primaryButton}>
+										<Text style={styles.primaryButtonText}>View Prep Plan</Text>
 									</View>
 								</View>
-								<Text style={styles.demandBody}>
-									Tomorrow • 12:00 PM • 2.5 mi away. Expected 80,000+ fans. High demand for finger foods predicted.
-								</Text>
-								<View style={styles.primaryButton}>
-									<Text style={styles.primaryButtonText}>View Prep Plan</Text>
-								</View>
-							</View>
-							<View style={styles.divider} />
-							<View style={styles.demandItem}>
-								<View style={styles.demandHeader}>
-									<Text style={styles.demandTitle}>Community Food Bank</Text>
-									<View style={styles.demandBadgeLight}>
-										<Text style={styles.demandBadgeLightText}>Donation Track</Text>
+								<View style={styles.divider} />
+								<View style={styles.demandItem}>
+									<View style={styles.demandHeader}>
+										<Text style={styles.demandTitle}>Community Food Bank</Text>
+										<View style={styles.demandBadgeLight}>
+											<Text style={styles.demandBadgeLightText}>Donation Track</Text>
+										</View>
 									</View>
-								</View>
-								<Text style={styles.demandBody}>
-									Pickup Feb 9. Finalize list for batches expiring between Feb 10-12 to maximize CSR credit.
-								</Text>
-								<View style={styles.secondaryButton}>
-									<Text style={styles.secondaryButtonText}>Draft List</Text>
-								</View>
-							</View>
-						</View>
-					</View>
-
-					<View style={styles.sidebar}>
-						<View style={styles.cardShell}>
-							<View style={styles.centeredBlock}>
-								<Text style={styles.metricLabel}>Recoverable Revenue</Text>
-								<Text style={styles.metricValue}>$4,250.00</Text>
-								<View style={styles.progressTrack}>
-									<View style={styles.progressFill} />
-								</View>
-								<Text style={styles.metricHint}>
-									85% of expiring value can be recovered through suggested specials.
-								</Text>
-								<View style={styles.purpleButton}>
-									<Text style={styles.purpleButtonText}>Dish Ideas</Text>
+									<Text style={styles.demandBody}>
+										Pickup Feb 9. Finalize list for batches expiring between Feb 10-12 to maximize CSR credit.
+									</Text>
+									<View style={styles.secondaryButton}>
+										<Text style={styles.secondaryButtonText}>Draft List</Text>
+									</View>
 								</View>
 							</View>
 						</View>
 
-						<View style={styles.statusCard}>
-							<Text style={styles.statusTitle}>System Status</Text>
-							<View style={styles.statusRow}>
-								<View style={styles.statusDot} />
-								<Text style={styles.statusText}>
-									Market pricing: <Text style={styles.statusBold}>Active</Text>
-								</Text>
+						<View style={styles.sidebar}>
+							<View style={styles.cardShell}>
+								<View style={styles.centeredBlock}>
+									<Text style={styles.metricLabel}>Recoverable Revenue</Text>
+									<Text style={styles.metricValue}>$4,250.00</Text>
+									<View style={styles.progressTrack}>
+										<View style={styles.progressFill} />
+									</View>
+									<Text style={styles.metricHint}>
+										85% of expiring value can be recovered through suggested specials.
+									</Text>
+									<View style={styles.purpleButton}>
+										<Text style={styles.purpleButtonText}>Dish Ideas</Text>
+									</View>
+								</View>
 							</View>
-							<View style={styles.statusRow}>
-								<View style={styles.statusDot} />
-								<Text style={styles.statusText}>
-									Supply chain: <Text style={styles.statusBold}>Stable</Text>
-								</Text>
+
+							<View style={styles.statusCard}>
+								<Text style={styles.statusTitle}>System Status</Text>
+								<View style={styles.statusRow}>
+									<View style={styles.statusDot} />
+									<Text style={styles.statusText}>
+										Market pricing: <Text style={styles.statusBold}>Active</Text>
+									</Text>
+								</View>
+								<View style={styles.statusRow}>
+									<View style={styles.statusDot} />
+									<Text style={styles.statusText}>
+										Supply chain: <Text style={styles.statusBold}>Stable</Text>
+									</Text>
+								</View>
 							</View>
 						</View>
-					</View>
 					</View>
 				</View>
 			</ScrollView>
+
+			{/* Floating Chat Widget */}
+			<ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
 		</SafeAreaView>
 	);
 }

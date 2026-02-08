@@ -47,9 +47,10 @@ app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secure-uga-hac
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:8081").split(",")
 CORS(
     app,
-    resources={r"/*": {"origins": ["http://localhost:8081"]}},
+    resources={r"/*": {"origins": _cors_origins}},
     supports_credentials=True,
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],

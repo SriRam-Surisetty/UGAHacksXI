@@ -1,7 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Modal, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
+import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
 import FloatingChatButton from '@/components/FloatingChatButton';
@@ -26,6 +27,68 @@ export default function Users() {
     const [isSaving, setIsSaving] = useState(false);
     const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [refreshKey, setRefreshKey] = useState(0);
+
+    // Edit modal state
+    const [editUser, setEditUser] = useState<UserRow | null>(null);
+    const [editEmail, setEditEmail] = useState('');
+    const [editPassword, setEditPassword] = useState('');
+    const [editRole, setEditRole] = useState<'admin' | 'manager'>('manager');
+    const [isEditing, setIsEditing] = useState(false);
+
+    const openEditModal = (user: UserRow) => {
+        setEditUser(user);
+        setEditEmail(user.email);
+        setEditPassword('');
+        setEditRole(user.role as 'admin' | 'manager');
+    };
+
+    const closeEditModal = () => {
+        setEditUser(null);
+        setEditEmail('');
+        setEditPassword('');
+        setEditRole('manager');
+    };
+
+    const handleEditUser = async () => {
+        if (!editUser) return;
+        if (isEditing) return;
+        setIsEditing(true);
+        setNotice(null);
+
+        try {
+            const body: Record<string, string> = {};
+            if (editEmail && editEmail !== editUser.email) body.email = editEmail;
+            if (editPassword) body.password = editPassword;
+            if (editRole !== editUser.role) body.role = editRole;
+
+            if (Object.keys(body).length === 0) {
+                closeEditModal();
+                return;
+            }
+
+            await api.patch(`/users/${editUser.userID}`, body);
+            setNotice({ type: 'success', message: 'User updated.' });
+            closeEditModal();
+            setRefreshKey((prev) => prev + 1);
+        } catch (error: any) {
+            const message = error?.response?.data?.error || 'Unable to update user.';
+            setNotice({ type: 'error', message });
+        } finally {
+            setIsEditing(false);
+        }
+    };
+
+    const handleDeleteUser = async (user: UserRow) => {
+        setNotice(null);
+        try {
+            await api.delete(`/users/${user.userID}`);
+            setNotice({ type: 'success', message: `${user.email} deleted.` });
+            setRefreshKey((prev) => prev + 1);
+        } catch (error: any) {
+            const message = error?.response?.data?.error || 'Unable to delete user.';
+            setNotice({ type: 'error', message });
+        }
+    };
 
     useEffect(() => {
         let isMounted = true;
@@ -230,7 +293,8 @@ export default function Users() {
                     </View>
                     <View style={styles.tableHeader}>
                         <Text style={[styles.tableCell, styles.tableHeaderText]}>Email</Text>
-                        <Text style={[styles.tableCell, styles.tableHeaderText]}>Role</Text>
+                        <Text style={[styles.tableCellSmall, styles.tableHeaderText]}>Role</Text>
+                        <Text style={[styles.tableCellActions, styles.tableHeaderText]}>Actions</Text>
                     </View>
                     {isLoading ? (
                         <Text style={styles.loadingText}>Loading users...</Text>
@@ -238,7 +302,15 @@ export default function Users() {
                         sortedUsers.map((user) => (
                             <View key={user.userID} style={styles.tableRow}>
                                 <Text style={styles.tableCell}>{user.email}</Text>
-                                <Text style={styles.tableCell}>{user.role}</Text>
+                                <Text style={styles.tableCellSmall}>{user.role}</Text>
+                                <View style={styles.tableCellActions}>
+                                    <TouchableOpacity style={styles.actionBtn} onPress={() => openEditModal(user)}>
+                                        <Ionicons name="pencil" size={16} color={Colors.landing.primaryPurple} />
+                                    </TouchableOpacity>
+                                    <TouchableOpacity style={styles.actionBtnDanger} onPress={() => handleDeleteUser(user)}>
+                                        <Ionicons name="trash-outline" size={16} color="#ef4444" />
+                                    </TouchableOpacity>
+                                </View>
                             </View>
                         ))
                     ) : (
@@ -246,6 +318,75 @@ export default function Users() {
                     )}
                 </View>
             </ScrollView>
+
+            {/* Edit User Modal */}
+            <Modal visible={!!editUser} transparent animationType="fade" onRequestClose={closeEditModal}>
+                <View style={styles.modalOverlay}>
+                    <View style={styles.modalCard}>
+                        <View style={styles.modalHeader}>
+                            <Text style={styles.sectionTitle}>Edit user</Text>
+                            <TouchableOpacity onPress={closeEditModal}>
+                                <Ionicons name="close" size={22} color="#6b7280" />
+                            </TouchableOpacity>
+                        </View>
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Email</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="name@company.com"
+                                value={editEmail}
+                                onChangeText={setEditEmail}
+                                autoCapitalize="none"
+                                keyboardType="email-address"
+                                editable={!isEditing}
+                            />
+                        </View>
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>New password (leave blank to keep current)</Text>
+                            <TextInput
+                                style={styles.input}
+                                placeholder="Enter new password"
+                                value={editPassword}
+                                onChangeText={setEditPassword}
+                                secureTextEntry
+                                editable={!isEditing}
+                            />
+                        </View>
+                        <View style={styles.formGroup}>
+                            <Text style={styles.label}>Role</Text>
+                            <View style={styles.roleToggle}>
+                                <TouchableOpacity
+                                    style={[styles.roleOption, editRole === 'manager' && styles.roleOptionActive]}
+                                    onPress={() => setEditRole('manager')}
+                                    disabled={isEditing}
+                                >
+                                    <Text style={[styles.roleOptionText, editRole === 'manager' && styles.roleOptionTextActive]}>
+                                        Manager
+                                    </Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.roleOption, editRole === 'admin' && styles.roleOptionActive]}
+                                    onPress={() => setEditRole('admin')}
+                                    disabled={isEditing}
+                                >
+                                    <Text style={[styles.roleOptionText, editRole === 'admin' && styles.roleOptionTextActive]}>
+                                        Admin
+                                    </Text>
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                        <View style={styles.modalActions}>
+                            <TouchableOpacity style={styles.btnSecondary} onPress={closeEditModal} disabled={isEditing}>
+                                <Text style={styles.btnSecondaryText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.btnPrimary} onPress={handleEditUser} disabled={isEditing}>
+                                <Text style={styles.btnPrimaryText}>{isEditing ? 'Saving...' : 'Save changes'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </View>
+                </View>
+            </Modal>
+
             <FloatingChatButton />
         </SafeAreaView>
     );
@@ -371,6 +512,28 @@ const styles = StyleSheet.create({
         fontSize: 13,
         color: '#374151',
     },
+    tableCellSmall: {
+        width: 80,
+        fontSize: 13,
+        color: '#374151',
+    },
+    tableCellActions: {
+        width: 80,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        justifyContent: 'flex-end',
+    },
+    actionBtn: {
+        padding: 6,
+        borderRadius: 6,
+        backgroundColor: '#f3f0ff',
+    },
+    actionBtnDanger: {
+        padding: 6,
+        borderRadius: 6,
+        backgroundColor: '#fef2f2',
+    },
     tableHeaderText: {
         fontWeight: '700',
         color: '#111827',
@@ -412,5 +575,43 @@ const styles = StyleSheet.create({
     loadingText: {
         fontSize: 14,
         color: '#6b7280',
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0,0,0,0.4)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: 24,
+    },
+    modalCard: {
+        backgroundColor: Colors.landing.white,
+        borderRadius: 12,
+        padding: 24,
+        width: '100%',
+        maxWidth: 440,
+    },
+    modalHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        marginBottom: 8,
+    },
+    modalActions: {
+        flexDirection: 'row',
+        gap: 10,
+        marginTop: 4,
+    },
+    btnSecondary: {
+        flex: 1,
+        paddingVertical: 12,
+        borderRadius: 8,
+        alignItems: 'center',
+        borderWidth: 1,
+        borderColor: '#d1d5db',
+    },
+    btnSecondaryText: {
+        fontWeight: '700',
+        fontSize: 14,
+        color: '#374151',
     },
 });

@@ -291,6 +291,178 @@ def manage_users():
         app.logger.exception("/users failed")
         return jsonify({"error": str(e)}), 500
 
+
+@app.route("/users/<int:user_id>", methods=["PATCH", "DELETE"])
+@jwt_required()
+def modify_user(user_id):
+    """Edit or delete a user within the same org (admin only)."""
+    try:
+        current = get_current_user()
+        if not current or current.uRole != 'admin':
+            return jsonify({"error": "Forbidden"}), 403
+
+        target = User.query.filter_by(userID=user_id, orgID=current.orgID).first()
+        if not target:
+            return jsonify({"error": "User not found"}), 404
+
+        if request.method == "DELETE":
+            if target.userID == current.userID:
+                return jsonify({"error": "Cannot delete yourself"}), 400
+            db.session.delete(target)
+            db.session.commit()
+            return jsonify({"msg": "User deleted"}), 200
+
+        # PATCH
+        data = request.get_json(silent=True) or {}
+        new_email = data.get("email", "").strip()
+        new_password = data.get("password", "").strip()
+        new_role = data.get("role", "").strip()
+
+        if new_email and new_email != target.email:
+            clash = User.query.filter(User.email == new_email, User.userID != target.userID).first()
+            if clash:
+                return jsonify({"error": "Email already in use"}), 409
+            target.email = new_email
+
+        if new_password:
+            target.hashed_pwd = generate_password_hash(new_password)
+
+        if new_role:
+            if new_role not in {"admin", "manager"}:
+                return jsonify({"error": "Invalid role"}), 400
+            target.uRole = new_role
+
+        db.session.commit()
+        return jsonify({
+            "msg": "User updated",
+            "user": {"userID": target.userID, "email": target.email, "role": target.uRole},
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("/users/<id> failed")
+        return jsonify({"error": str(e)}), 500
+
+
+# --- Dashboard Route ---
+
+@app.route("/dashboard", methods=["GET"])
+@jwt_required()
+def dashboard_summary():
+    """Return a summary of the organization's inventory state for the dashboard."""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        org_id = user.orgID
+        org = Org.query.get(org_id) if org_id else None
+        today = datetime.utcnow().date()
+        from datetime import timedelta
+        soon = today + timedelta(days=3)
+
+        # ---- Stock batches with qty via __STOCK__ dish ----
+        stock_dish = Dish.query.filter(
+            Dish.orgID == org_id,
+            Dish.dishName == STOCK_DISH_NAME,
+        ).first()
+        stock_dish_id = stock_dish.dishID if stock_dish else None
+
+        batch_rows = Ingredient.query.filter(
+            Ingredient.orgID == org_id,
+            or_(Ingredient.expiry.isnot(None), Ingredient.batchNum.isnot(None)),
+        ).order_by(
+            Ingredient.expiry.is_(None),
+            Ingredient.expiry.asc(),
+            Ingredient.ingName.asc(),
+        ).all()
+
+        qty_map = {}
+        if stock_dish_id and batch_rows:
+            ing_ids = [b.ingID for b in batch_rows]
+            qty_rows = DishIngredient.query.filter(
+                DishIngredient.dishID == stock_dish_id,
+                DishIngredient.ingID.in_(ing_ids),
+            ).all()
+            qty_map = {
+                row.ingID: {"qty": float(row.qty) if row.qty is not None else None, "unit": row.unit}
+                for row in qty_rows
+            }
+
+        # Categorise batches
+        expiring_batches = []  # expiry today..soon
+        expired_batches = []   # expiry < today
+        healthy_batches = 0
+
+        for b in batch_rows:
+            info = {
+                "ingID": b.ingID,
+                "ingName": b.ingName,
+                "category": b.category,
+                "expiry": b.expiry.isoformat() if b.expiry else None,
+                "batchNum": b.batchNum,
+                "qty": qty_map.get(b.ingID, {}).get("qty"),
+                "unit": qty_map.get(b.ingID, {}).get("unit"),
+            }
+            if b.expiry:
+                if b.expiry < today:
+                    expired_batches.append(info)
+                elif b.expiry <= soon:
+                    expiring_batches.append(info)
+                else:
+                    healthy_batches += 1
+            else:
+                healthy_batches += 1
+
+        # ---- Counts ----
+        total_ingredients = Ingredient.query.filter(
+            Ingredient.orgID == org_id,
+            Ingredient.expiry.is_(None),
+            Ingredient.batchNum.is_(None),
+        ).count()
+
+        total_dishes = Dish.query.filter(
+            Dish.orgID == org_id,
+            Dish.dishName != STOCK_DISH_NAME,
+        ).count()
+
+        total_users = User.query.filter(User.orgID == org_id).count()
+        total_batches = len(batch_rows)
+
+        # ---- Categories breakdown ----
+        categories = (
+            db.session.query(Ingredient.category, func.count(Ingredient.ingID))
+            .filter(
+                Ingredient.orgID == org_id,
+                Ingredient.expiry.is_(None),
+                Ingredient.batchNum.is_(None),
+            )
+            .group_by(Ingredient.category)
+            .all()
+        )
+        category_counts = {cat or "Uncategorized": count for cat, count in categories}
+
+        return jsonify({
+            "orgName": org.orgName if org else None,
+            "counts": {
+                "ingredients": total_ingredients,
+                "dishes": total_dishes,
+                "users": total_users,
+                "batches": total_batches,
+                "healthy": healthy_batches,
+                "expiring": len(expiring_batches),
+                "expired": len(expired_batches),
+            },
+            "expiringBatches": expiring_batches[:10],
+            "expiredBatches": expired_batches[:10],
+            "categories": category_counts,
+        }), 200
+
+    except Exception as e:
+        app.logger.exception("/dashboard failed")
+        return jsonify({"error": str(e)}), 500
+
+
 # Copy your login and dish routes here...
 
 # --- Inventory Routes ---

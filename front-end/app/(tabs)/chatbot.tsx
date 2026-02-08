@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import { useRouter } from 'expo-router';
 import {
     StyleSheet,
     TextInput as NativeTextInput,
@@ -127,6 +128,7 @@ export default function Chatbot() {
     const [isLoading, setIsLoading] = useState(false);
     const [lastMessageId, setLastMessageId] = useState<string | null>(null);
     const flatListRef = useRef<any>(null);
+    const router = useRouter();
 
     const sendMessage = async () => {
         if (!input.trim() || isLoading) return;
@@ -144,7 +146,8 @@ export default function Chatbot() {
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://localhost:5001/chat', {
+            // Use local IP address for physical device testing
+            const response = await fetch('http://172.21.218.223:5001/chat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ message: userMessage.text }),
@@ -202,6 +205,9 @@ export default function Chatbot() {
             {/* Header */}
             <View style={styles.header}>
                 <View style={styles.headerContent}>
+                    <TouchableOpacity onPress={() => router.back()} style={{ marginRight: 10 }}>
+                        <Ionicons name="arrow-back" size={24} color="#111827" />
+                    </TouchableOpacity>
                     <View style={styles.headerIcon}>
                         <Ionicons name="chatbubbles" size={20} color="#fff" />
                     </View>
@@ -257,13 +263,18 @@ export default function Chatbot() {
                 <View style={styles.inputArea}>
                     <View style={styles.inputContainer}>
                         <TextInput
-                            style={styles.input}
+                            style={[
+                                styles.input,
+                                Platform.OS === 'web' && { fontFamily: 'System', outlineStyle: 'none' } // Fix for emojis & remove focus ring
+                            ]}
                             value={input}
                             onChangeText={setInput}
                             placeholder="Message StockSense AI..."
                             placeholderTextColor="#9ca3af"
                             multiline
                             maxLength={2000}
+                            autoCorrect={false}
+                            spellCheck={false}
                             onKeyPress={(e: any) => {
                                 if (Platform.OS === 'web' && e.nativeEvent.key === 'Enter' && !e.nativeEvent.shiftKey) {
                                     e.preventDefault();

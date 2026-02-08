@@ -22,8 +22,10 @@ export default function TabLayout() {
       <Tabs.Screen
         name="chatbot"
         options={{
+          href: null,
           title: 'Chatbot',
           tabBarIcon: ({ color }: { color: string }) => <IconSymbol size={28} name="message.fill" color={color} />,
+          tabBarStyle: { display: 'none' },
         }}
       />
     </Tabs>

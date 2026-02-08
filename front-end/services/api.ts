@@ -1,5 +1,6 @@
 import axios from 'axios';
-import { Platform } from 'react-native';
+import { Platform, Alert } from 'react-native';
+import { router } from 'expo-router';
 
 const getBaseUrl = () => {
     if (Platform.OS === 'android') {
@@ -8,7 +9,7 @@ const getBaseUrl = () => {
     return 'http://localhost:5001';
 };
 
-import { deleteToken, deleteUserId, getToken } from './storage';
+import { deleteToken, deleteUserId, deleteUserProfile, getToken } from './storage';
 
 const api = axios.create({
     baseURL: getBaseUrl(),
@@ -30,11 +31,38 @@ api.interceptors.response.use(
     async (error) => {
         const status = error?.response?.status;
         const reason = error?.response?.data?.reason;
+        const message = error?.response?.data?.message;
+        
+        // Handle invalid JWT subject
         if (status === 422 && typeof reason === 'string' && reason.toLowerCase().includes('subject must be a string')) {
             await deleteToken();
             await deleteUserId();
+            await deleteUserProfile();
             console.warn('[api] Cleared auth token due to invalid JWT subject. Please log in again.');
+            
+            Alert.alert(
+                'Session Expired',
+                'Your session has expired. Please log in again.',
+                [{ text: 'OK', onPress: () => router.replace('/login') }]
+            );
+            return Promise.reject(error);
         }
+        
+        // Handle token expiration or unauthorized access (401)
+        if (status === 401) {
+            await deleteToken();
+            await deleteUserId();
+            await deleteUserProfile();
+            console.warn('[api] Token expired or unauthorized. Redirecting to login.');
+            
+            Alert.alert(
+                'Session Expired',
+                'Your session has expired. Please log in again.',
+                [{ text: 'OK', onPress: () => router.replace('/login') }]
+            );
+            return Promise.reject(error);
+        }
+        
         return Promise.reject(error);
     }
 );

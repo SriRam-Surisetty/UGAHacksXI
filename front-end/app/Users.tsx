@@ -3,22 +3,20 @@ import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
-import ChatWidget from '@/components/ChatWidget';
+import FloatingChatButton from '@/components/FloatingChatButton';
 
 export default function Users() {
-    const [isChatOpen, setIsChatOpen] = useState(false);
-
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
-            <AuthHeader activeRoute="/Users" onChatPress={() => setIsChatOpen(true)} />
+            <AuthHeader activeRoute="/Users" />
             <View style={styles.content}>
                 <Text style={styles.title}>Users</Text>
                 <Text style={styles.subtitle}>User management is coming soon.</Text>
             </View>
 
-            {/* Floating Chat Widget */}
-            <ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+            {/* Floating Chat Button */}
+            <FloatingChatButton />
         </SafeAreaView>
     );
 }

@@ -3,7 +3,7 @@ import { SafeAreaView, ScrollView, StyleSheet, Text, TextInput, TouchableOpacity
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
-import ChatWidget from '@/components/ChatWidget';
+import FloatingChatButton from '@/components/FloatingChatButton';
 
 type Dish = {
 	id: number;
@@ -41,7 +41,7 @@ const ingredients: Ingredient[] = [
 export default function Inventory() {
 	const [activeTab, setActiveTab] = useState<TabKey>('dishes');
 	const [search, setSearch] = useState('');
-	const [isChatOpen, setIsChatOpen] = useState(false);
+
 
 	const filteredDishes = useMemo(() => {
 		const needle = search.trim().toLowerCase();
@@ -65,7 +65,7 @@ export default function Inventory() {
 	return (
 		<SafeAreaView style={styles.container}>
 			<StatusBar style="dark" />
-			<AuthHeader activeRoute="/Inventory" onChatPress={() => setIsChatOpen(true)} />
+			<AuthHeader activeRoute="/Inventory" />
 			<ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
 				<View style={styles.contentWrapper}>
 					<View style={styles.headerRow}>
@@ -153,8 +153,8 @@ export default function Inventory() {
 				</View>
 			</ScrollView>
 
-			{/* Floating Chat Widget */}
-			<ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+			{/* Floating Chat Button */}
+			<FloatingChatButton />
 		</SafeAreaView>
 	);
 }

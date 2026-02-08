@@ -14,6 +14,7 @@ import { ThemedText } from '@/components/themed-text';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
+import AuthHeader from '@/components/auth-header';
 
 // Cast components to any to fix strict TS error "JSX element class does not support attributes"
 const TextInput = NativeTextInput as any;
@@ -117,6 +118,7 @@ export default function Chatbot() {
 
     return (
         <SafeAreaView style={styles.container}>
+            <AuthHeader activeRoute="/(tabs)/chatbot" />
             <ThemedView style={styles.header}>
                 <ThemedText type="title">Gemini Chat</ThemedText>
             </ThemedView>

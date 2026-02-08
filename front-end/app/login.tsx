@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
     Alert,
     Dimensions,
@@ -16,7 +16,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import api from '@/services/api';
-import { saveToken, saveUserId } from '@/services/storage';
+import { getToken, saveToken, saveUserId } from '@/services/storage';
 
 const { width } = Dimensions.get('window');
 
@@ -26,6 +26,27 @@ export default function LoginScreen() {
     const [rememberMe, setRememberMe] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
     const router = useRouter();
+
+    useEffect(() => {
+        let isActive = true;
+
+        const checkSession = async () => {
+            try {
+                const token = await getToken();
+                if (token && isActive) {
+                    router.replace('/Dashboard');
+                }
+            } catch (error) {
+                // No-op: if storage is unavailable, stay on login screen.
+            }
+        };
+
+        checkSession();
+
+        return () => {
+            isActive = false;
+        };
+    }, [router]);
 
     const showAlert = (title: string, message: string) => {
         if (Platform.OS === 'web' && typeof globalThis !== 'undefined' && 'alert' in globalThis) {
@@ -55,7 +76,7 @@ export default function LoginScreen() {
                 await saveToken(response.data.access_token);
                 await saveUserId(email);
                 showAlert('Success', 'Login successful');
-                router.replace('/(tabs)');
+                router.replace('/Dashboard');
             }
         } catch (error: any) {
             showAlert('Login failed', error.response?.data?.msg || 'An error occurred');

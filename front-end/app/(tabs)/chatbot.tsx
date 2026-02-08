@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { useRouter } from 'expo-router';
+import { useRouter, useFocusEffect } from 'expo-router';
 import {
     StyleSheet,
     TextInput as NativeTextInput,
@@ -186,6 +186,13 @@ export default function Chatbot() {
             setTimeout(() => flatListRef.current?.scrollToEnd({ animated: true }), 100);
         }
     }, [messages, isLoading]);
+
+    // Scroll to bottom when screen is focused
+    useFocusEffect(
+        React.useCallback(() => {
+            setTimeout(() => flatListRef.current?.scrollToEnd({ animated: false }), 100);
+        }, [])
+    );
 
     const renderMessage = ({ item }: { item: Message }) => (
         <MessageBubble item={item} isNew={item.id === lastMessageId} />

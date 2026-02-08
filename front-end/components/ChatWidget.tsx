@@ -179,11 +179,22 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
         }
     };
 
+    // Find the lowest available tab ID (reuse gaps)
+    const getNextAvailableTabId = (currentTabs: ChatTab[]): number => {
+        const existingIds = currentTabs.map(t => t.id).sort((a, b) => a - b);
+        for (let i = 1; i <= existingIds.length + 1; i++) {
+            if (!existingIds.includes(i)) {
+                return i;
+            }
+        }
+        return existingIds.length + 1;
+    };
+
     const addNewTab = () => {
-        const newTab = createTab(nextTabId);
+        const newId = getNextAvailableTabId(tabs);
+        const newTab = createTab(newId);
         setTabs(prev => [...prev, newTab]);
-        setActiveTabId(nextTabId);
-        setNextTabId(prev => prev + 1);
+        setActiveTabId(newId);
         setInputText('');
         setTimeout(() => tabScrollRef.current?.scrollToEnd({ animated: true }), 100);
     };
@@ -192,9 +203,8 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
         setTabs(prev => {
             const remaining = prev.filter(t => t.id !== tabId);
             if (remaining.length === 0) {
-                // Always keep at least one tab
-                const fresh = createTab(nextTabId);
-                setNextTabId(n => n + 1);
+                // Always keep at least one tab - reset to tab 1
+                const fresh = createTab(1);
                 setActiveTabId(fresh.id);
                 return [fresh];
             }
@@ -228,6 +238,8 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
                     useNativeDriver: true,
                 }),
             ]).start();
+            // Scroll to bottom when chat opens
+            setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 100);
         } else {
             Animated.parallel([
                 Animated.timing(scaleAnim, {
@@ -243,6 +255,13 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
             ]).start();
         }
     }, [isOpen]);
+
+    // Scroll to bottom when switching tabs
+    useEffect(() => {
+        if (isOpen) {
+            setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: false }), 100);
+        }
+    }, [activeTabId]);
 
     const sendMessage = async () => {
         if (!inputText.trim() || isLoading) return;

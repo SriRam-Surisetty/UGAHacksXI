@@ -3,7 +3,7 @@ import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import api from '@/services/api';
-import { deleteToken, deleteUserId, getToken } from '@/services/storage';
+import { deleteToken, deleteUserId, deleteUserProfile, getToken, getUserProfile, saveUserProfile } from '@/services/storage';
 
 const fontFamilies = {
     regular: 'IBMPlexSans_400Regular',
@@ -39,6 +39,7 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
                 if (!token && isMounted) {
                     await deleteToken();
                     await deleteUserId();
+                    await deleteUserProfile();
                     router.replace('/login');
                     return;
                 }
@@ -61,11 +62,24 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
 
         const loadUserInfo = async () => {
             try {
+                const cached = await getUserProfile();
+                if (cached && isMounted) {
+                    setOrgName(cached.orgName || 'Organization');
+                    setRoleName(cached.role || 'User');
+                    setEmail(cached.email || '');
+                    return;
+                }
+
                 const response = await api.get('/users/me');
                 if (isMounted) {
                     setOrgName(response.data?.orgName || 'Organization');
                     setRoleName(response.data?.role || 'User');
                     setEmail(response.data?.email || '');
+                    await saveUserProfile({
+                        orgName: response.data?.orgName ?? null,
+                        role: response.data?.role ?? null,
+                        email: response.data?.email ?? null,
+                    });
                 }
             } catch (error) {
                 if (isMounted) {
@@ -87,6 +101,7 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
         try {
             await deleteToken();
             await deleteUserId();
+            await deleteUserProfile();
         } finally {
             router.replace('/login');
         }
@@ -98,13 +113,17 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
         }
     };
 
+    const visibleNavItems = roleName.toLowerCase() === 'admin'
+        ? navItems
+        : navItems.filter((item) => item.route !== '/Users');
+
     return (
         <View style={styles.container}>
             <View style={styles.inner}>
                 <View style={styles.leftGroup}>
                     <Text style={styles.brand}>StockSense</Text>
                     <View style={styles.nav}>
-                        {navItems.map((item) => {
+                        {visibleNavItems.map((item) => {
                             const isActive = activeRoute === item.route;
                             return (
                                 <TouchableOpacity key={item.label} onPress={() => handleNavPress(item)}>

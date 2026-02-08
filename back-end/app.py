@@ -71,14 +71,6 @@ def signup():
         if missing_fields:
             return jsonify({"error": f"Missing fields: {', '.join(missing_fields)}"}), 400
 
-        existing_org = Org.query.filter_by(orgName=data.get("orgName")).first()
-        if existing_org:
-            return jsonify({"msg": "Organization name already exists"}), 409
-
-        existing_user = User.query.filter_by(email=data.get("email")).first()
-        if existing_user:
-            return jsonify({"msg": "Email already exists"}), 409
-
         # ... logic for creating Org and Admin User ...
         new_org = Org(orgName=data.get("orgName"), org_email=data.get("email"))
         db.session.add(new_org)
@@ -126,35 +118,48 @@ def login():
 
 # Copy your login and dish routes here...
 
-# --- Gemini Chatbot Route ---
-import google.generativeai as genai
-
-@app.route("/chat", methods=["POST"])
-def chat():
+# --- Chatbot Route ---
+@app.route("/chatbot", methods=["POST", "OPTIONS"])
+def chatbot():
+    if request.method == "OPTIONS":
+        return ("", 200)
+    
     try:
         data = request.get_json(silent=True)
-        if not data:
-            return jsonify({"error": "Missing JSON body"}), 400
-
-        message = data.get("message")
-        if not message:
+        if not data or 'message' not in data:
             return jsonify({"error": "Missing message field"}), 400
-
-        api_key = os.getenv("GEMINI_API_KEY")
-        if not api_key:
-            app.logger.error("GEMINI_API_KEY is not set")
-            return jsonify({"error": "Server configuration error: API key missing"}), 500
-
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel('gemini-pro')
         
-        chat = model.start_chat(history=[])
-        response = chat.send_message(message)
+        user_message = data.get('message', '').lower()
+        response = ''
         
-        return jsonify({"response": response.text}), 200
-
+        # AI-powered response logic
+        if 'ai' in user_message or 'work' in user_message:
+            response = 'Our AI uses advanced machine learning algorithms to analyze your inventory patterns and predict stockouts with 95% accuracy. It continuously learns from your data to provide smarter recommendations! 🧠'
+        elif 'pricing' in user_message or 'cost' in user_message or 'price' in user_message:
+            response = 'We offer flexible pricing plans starting from $49/month. All plans include AI forecasting, real-time tracking, and 24/7 support. Want to see our full pricing? 💰'
+        elif 'trial' in user_message or 'free' in user_message:
+            response = 'Great! You can start your free 14-day trial right now - no credit card required. Sign up to get started! 🚀'
+        elif 'waste' in user_message:
+            response = 'Our platform helps reduce waste by 40% on average through predictive analytics and smart reordering. You\'ll save money and help the environment! 🌱'
+        elif 'demo' in user_message:
+            response = 'I\'d love to show you a demo! You can book a personalized demo with our team or watch a quick video tour. 🎥'
+        elif 'hello' in user_message or 'hi' in user_message or 'hey' in user_message:
+            response = 'Hello! 👋 Welcome to StockSense. How can I help you today?'
+        elif 'feature' in user_message:
+            response = 'StockSense offers AI forecasting, smart reordering, waste analytics, real-time tracking, and automated alerts. What would you like to know more about?'
+        elif 'integration' in user_message or 'integrate' in user_message:
+            response = 'We integrate with popular POS systems, accounting software, and supply chain management tools. Our API makes it easy to connect with your existing workflow. 🔌'
+        elif 'support' in user_message or 'help' in user_message:
+            response = 'We offer 24/7 customer support via chat, email, and phone. Plus, you get access to our comprehensive knowledge base and video tutorials. 💬'
+        else:
+            response = 'That\'s a great question! I recommend chatting with our team for more details. You can start your free trial or contact us directly. 😊'
+        
+        return jsonify({
+            "response": response,
+            "timestamp": "just now"
+        }), 200
     except Exception as e:
-        app.logger.exception("/chat failed with error")
+        app.logger.exception("/chatbot failed with error")
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':

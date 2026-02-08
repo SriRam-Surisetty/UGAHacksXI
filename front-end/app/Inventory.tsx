@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
 import FloatingChatButton from '@/components/FloatingChatButton';
+import api from '@/services/api';
 
 type DishRow = {
 	id: number;

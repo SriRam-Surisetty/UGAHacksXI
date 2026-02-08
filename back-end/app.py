@@ -7,6 +7,8 @@ from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import io
 import csv
+import json
+import re
 import logging
 from dotenv import load_dotenv
 from datetime import datetime
@@ -100,6 +102,42 @@ class DishIngredient(db.Model):
     qty = db.Column(db.Numeric(10, 2))
     unit = db.Column(db.String(20))
 
+
+class AuditLog(db.Model):
+    __tablename__ = 'audit_logs'
+    logID = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    timestamp = db.Column(db.DateTime, nullable=False, default=datetime.utcnow)
+    userID = db.Column(db.Integer, db.ForeignKey('users.userID'), nullable=True)
+    orgID = db.Column(db.Integer, db.ForeignKey('orgs.orgID'), nullable=True)
+    action = db.Column(db.String(50), nullable=False)       # CREATE, UPDATE, DELETE, LOGIN, etc.
+    resource_type = db.Column(db.String(50), nullable=False) # user, ingredient, dish, batch, org, etc.
+    resource_id = db.Column(db.Integer, nullable=True)
+    details = db.Column(db.Text, nullable=True)              # JSON string with extra context
+    ip_address = db.Column(db.String(45), nullable=True)
+
+
+def record_audit(action, resource_type, resource_id=None, details=None,
+                 user_id=None, org_id=None):
+    """Write a row to the audit_logs table."""
+    try:
+        entry = AuditLog(
+            timestamp=datetime.utcnow(),
+            userID=user_id,
+            orgID=org_id,
+            action=action,
+            resource_type=resource_type,
+            resource_id=resource_id,
+            details=json.dumps(details, default=str) if details else None,
+            ip_address=request.remote_addr if request else None,
+        )
+        db.session.add(entry)
+        # Don't commit here — let the caller's commit include this row.
+        # If the caller rolls back, the audit entry is also rolled back (correct).
+        db.session.flush()
+    except Exception:
+        app.logger.exception("Failed to write audit log")
+
+
 def get_current_user():
     user_id = get_jwt_identity()
     if not user_id:
@@ -176,6 +214,13 @@ def signup():
             uRole='admin'
         )
         db.session.add(admin_user)
+        db.session.flush()
+        record_audit("CREATE", "org", resource_id=new_org.orgID,
+                      details={"orgName": new_org.orgName},
+                      user_id=admin_user.userID, org_id=new_org.orgID)
+        record_audit("CREATE", "user", resource_id=admin_user.userID,
+                      details={"email": admin_user.email, "role": "admin"},
+                      user_id=admin_user.userID, org_id=new_org.orgID)
         db.session.commit()
         return jsonify({"msg": "Org and Admin created"}), 201
     except Exception as e:
@@ -201,9 +246,18 @@ def login():
 
         user = User.query.filter_by(email=email).first()
         if not user or not check_password_hash(user.hashed_pwd, password):
+            record_audit("LOGIN_FAILED", "auth",
+                          details={"email": email},
+                          user_id=user.userID if user else None,
+                          org_id=user.orgID if user else None)
+            db.session.commit()
             return jsonify({"error": "Invalid credentials"}), 401
 
         access_token = create_access_token(identity=str(user.userID))
+        record_audit("LOGIN", "auth", resource_id=user.userID,
+                      details={"email": user.email},
+                      user_id=user.userID, org_id=user.orgID)
+        db.session.commit()
         return jsonify({"access_token": access_token, "userID": user.userID}), 200
     except Exception as e:
         app.logger.exception("/login failed with error")
@@ -278,6 +332,10 @@ def manage_users():
             uRole=role,
         )
         db.session.add(new_user)
+        db.session.flush()
+        record_audit("CREATE", "user", resource_id=new_user.userID,
+                      details={"email": new_user.email, "role": new_user.uRole},
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
 
         return jsonify({
@@ -310,6 +368,9 @@ def modify_user(user_id):
         if request.method == "DELETE":
             if target.userID == current.userID:
                 return jsonify({"error": "Cannot delete yourself"}), 400
+            record_audit("DELETE", "user", resource_id=target.userID,
+                          details={"email": target.email},
+                          user_id=current.userID, org_id=current.orgID)
             db.session.delete(target)
             db.session.commit()
             return jsonify({"msg": "User deleted"}), 200
@@ -320,20 +381,28 @@ def modify_user(user_id):
         new_password = data.get("password", "").strip()
         new_role = data.get("role", "").strip()
 
+        changes = {}
         if new_email and new_email != target.email:
             clash = User.query.filter(User.email == new_email, User.userID != target.userID).first()
             if clash:
                 return jsonify({"error": "Email already in use"}), 409
+            changes["email"] = {"from": target.email, "to": new_email}
             target.email = new_email
 
         if new_password:
+            changes["password"] = "changed"
             target.hashed_pwd = generate_password_hash(new_password)
 
         if new_role:
             if new_role not in {"admin", "manager"}:
                 return jsonify({"error": "Invalid role"}), 400
+            if new_role != target.uRole:
+                changes["role"] = {"from": target.uRole, "to": new_role}
             target.uRole = new_role
 
+        record_audit("UPDATE", "user", resource_id=target.userID,
+                      details=changes,
+                      user_id=current.userID, org_id=current.orgID)
         db.session.commit()
         return jsonify({
             "msg": "User updated",
@@ -581,6 +650,10 @@ def create_master_ingredient():
             orgID=user.orgID,
         )
         db.session.add(new_ing)
+        db.session.flush()
+        record_audit("CREATE", "ingredient", resource_id=new_ing.ingID,
+                      details={"ingName": new_ing.ingName, "category": new_ing.category},
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
 
         return jsonify({
@@ -622,6 +695,9 @@ def update_or_delete_master_ingredient(ing_id):
                     "error": "Ingredient is used in dishes",
                     "linkedDishes": usage_count,
                 }), 409
+            record_audit("DELETE", "ingredient", resource_id=ingredient.ingID,
+                          details={"ingName": ingredient.ingName},
+                          user_id=user.userID, org_id=user.orgID)
             db.session.delete(ingredient)
             db.session.commit()
             return jsonify({"msg": "Ingredient deleted"}), 200
@@ -632,13 +708,21 @@ def update_or_delete_master_ingredient(ing_id):
 
         ing_name = data.get("ingName")
         category = data.get("category")
+        changes = {}
         if ing_name is not None:
             if not ing_name:
                 return jsonify({"error": "ingName cannot be empty"}), 400
+            if ing_name != ingredient.ingName:
+                changes["ingName"] = {"from": ingredient.ingName, "to": ing_name}
             ingredient.ingName = ing_name
         if category is not None:
+            if category != ingredient.category:
+                changes["category"] = {"from": ingredient.category, "to": category}
             ingredient.category = category
 
+        record_audit("UPDATE", "ingredient", resource_id=ingredient.ingID,
+                      details=changes,
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
         return jsonify({
             "msg": "Ingredient updated",
@@ -705,6 +789,10 @@ def create_dish():
                     unit=item.get("unit"),
                 ))
 
+        record_audit("CREATE", "dish", resource_id=new_dish.dishID,
+                      details={"dishName": new_dish.dishName,
+                               "ingredient_count": len(ingredients)},
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
         return jsonify({
             "msg": "Dish created",
@@ -781,6 +869,9 @@ def update_or_delete_dish(dish_id):
             return jsonify({"error": "Dish not found"}), 404
 
         if request.method == "DELETE":
+            record_audit("DELETE", "dish", resource_id=dish.dishID,
+                          details={"dishName": dish.dishName},
+                          user_id=user.userID, org_id=user.orgID)
             db.session.delete(dish)
             db.session.commit()
             return jsonify({"msg": "Dish deleted"}), 200
@@ -827,6 +918,10 @@ def update_or_delete_dish(dish_id):
                     unit=item.get("unit"),
                 ))
 
+        record_audit("UPDATE", "dish", resource_id=dish.dishID,
+                      details={"dishName": dish.dishName,
+                               "ingredients_updated": ingredients is not None},
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
         return jsonify({
             "msg": "Dish updated",
@@ -977,6 +1072,12 @@ def create_stock_batch():
             unit=unit,
         ))
 
+        record_audit("CREATE", "batch", resource_id=new_batch.ingID,
+                      details={"ingName": new_batch.ingName,
+                               "batchNum": batch_num,
+                               "expiry": str(expiry) if expiry else None,
+                               "qty": str(qty), "unit": unit},
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
 
         return jsonify({
@@ -1025,6 +1126,9 @@ def update_or_delete_stock_batch(ing_id):
                     DishIngredient.dishID == stock_dish.dishID,
                     DishIngredient.ingID == batch.ingID,
                 ).delete()
+            record_audit("DELETE", "batch", resource_id=batch.ingID,
+                          details={"ingName": batch.ingName, "batchNum": batch.batchNum},
+                          user_id=user.userID, org_id=user.orgID)
             db.session.delete(batch)
             db.session.commit()
             return jsonify({"msg": "Batch deleted"}), 200
@@ -1082,6 +1186,11 @@ def update_or_delete_stock_batch(ing_id):
                 DishIngredient.ingID == batch.ingID,
             ).first()
 
+        record_audit("UPDATE", "batch", resource_id=batch.ingID,
+                      details={"ingName": batch.ingName,
+                               "batchNum": batch.batchNum,
+                               "expiry": batch.expiry.isoformat() if batch.expiry else None},
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
         return jsonify({
             "msg": "Batch updated",
@@ -1223,6 +1332,11 @@ def consume_stock_for_dish():
                     "unit": link.unit,
                 })
 
+        record_audit("CONSUME", "stock", resource_id=dish.dishID,
+                      details={"dishName": dish.dishName,
+                               "quantity": float(cooked_qty),
+                               "deductions_count": len(deductions)},
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
         return jsonify({
             "msg": "Stock updated",
@@ -1286,6 +1400,10 @@ def export_ingredients():
             Ingredient.batchNum.is_(None),
         ).order_by(Ingredient.ingName.asc()).all()
         rows = [{"ingName": i.ingName, "category": i.category or ""} for i in ingredients]
+        record_audit("EXPORT", "ingredient",
+                      details={"count": len(rows)},
+                      user_id=user.userID, org_id=user.orgID)
+        db.session.commit()
         return make_csv_response(rows, ["ingName", "category"], "ingredients.csv")
     except Exception as e:
         app.logger.exception("/export/ingredients failed")
@@ -1326,6 +1444,9 @@ def import_ingredients():
                 orgID=user.orgID,
             ))
             created += 1
+        record_audit("IMPORT", "ingredient",
+                      details={"created": created, "skipped": skipped},
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
         return jsonify({"msg": f"{created} ingredients imported, {skipped} skipped"}), 201
     except Exception as e:
@@ -1365,6 +1486,10 @@ def export_dishes():
                     })
             else:
                 rows.append({"dishName": dish.dishName, "ingName": "", "qty": "", "unit": ""})
+        record_audit("EXPORT", "dish",
+                      details={"dish_count": len(dishes), "row_count": len(rows)},
+                      user_id=user.userID, org_id=user.orgID)
+        db.session.commit()
         return make_csv_response(rows, ["dishName", "ingName", "qty", "unit"], "dishes.csv")
     except Exception as e:
         app.logger.exception("/export/dishes failed")
@@ -1427,6 +1552,9 @@ def import_dishes():
                         unit=ing_info["unit"] or None,
                     ))
             created += 1
+        record_audit("IMPORT", "dish",
+                      details={"created": created, "skipped": skipped},
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
         return jsonify({"msg": f"{created} dishes imported, {skipped} skipped"}), 201
     except Exception as e:
@@ -1472,6 +1600,10 @@ def export_stock():
                 "qty": q.get("qty", ""),
                 "unit": q.get("unit", ""),
             })
+        record_audit("EXPORT", "stock",
+                      details={"count": len(rows)},
+                      user_id=user.userID, org_id=user.orgID)
+        db.session.commit()
         return make_csv_response(rows, ["ingName", "category", "batchNum", "expiry", "qty", "unit"], "stock.csv")
     except Exception as e:
         app.logger.exception("/export/stock failed")
@@ -1543,6 +1675,9 @@ def import_stock():
                 unit=unit_str,
             ))
             created += 1
+        record_audit("IMPORT", "stock",
+                      details={"created": created, "skipped": skipped},
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
         return jsonify({"msg": f"{created} batches imported, {skipped} skipped"}), 201
     except Exception as e:
@@ -1564,6 +1699,10 @@ def export_users():
             return jsonify({"error": "Forbidden"}), 403
         users = User.query.filter(User.orgID == user.orgID).order_by(User.email.asc()).all()
         rows = [{"email": u.email, "role": u.uRole} for u in users]
+        record_audit("EXPORT", "user",
+                      details={"count": len(rows)},
+                      user_id=user.userID, org_id=user.orgID)
+        db.session.commit()
         return make_csv_response(rows, ["email", "role"], "users.csv")
     except Exception as e:
         app.logger.exception("/export/users failed")
@@ -1604,6 +1743,9 @@ def import_users():
                 uRole=role,
             ))
             created += 1
+        record_audit("IMPORT", "user",
+                      details={"created": created, "skipped": skipped},
+                      user_id=user.userID, org_id=user.orgID)
         db.session.commit()
         return jsonify({"msg": f"{created} users imported, {skipped} skipped"}), 201
     except Exception as e:
@@ -1612,11 +1754,72 @@ def import_users():
         return jsonify({"error": str(e)}), 500
 
 
+# --- Audit Log Route ---
+
+@app.route("/audit-logs", methods=["GET"])
+@jwt_required()
+def get_audit_logs():
+    """Return paginated audit logs for the current org (admin only)."""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        if user.uRole != "admin":
+            return jsonify({"error": "Forbidden"}), 403
+
+        page = request.args.get("page", 1, type=int)
+        per_page = request.args.get("per_page", 50, type=int)
+        per_page = min(per_page, 200)
+
+        action_filter = request.args.get("action", "").strip()
+        resource_filter = request.args.get("resource_type", "").strip()
+
+        query = AuditLog.query.filter(AuditLog.orgID == user.orgID)
+
+        if action_filter:
+            query = query.filter(AuditLog.action == action_filter)
+        if resource_filter:
+            query = query.filter(AuditLog.resource_type == resource_filter)
+
+        query = query.order_by(AuditLog.timestamp.desc())
+
+        total = query.count()
+        logs = query.offset((page - 1) * per_page).limit(per_page).all()
+
+        # Look up user emails for display
+        user_ids = {log.userID for log in logs if log.userID}
+        user_map = {}
+        if user_ids:
+            users = User.query.filter(User.userID.in_(user_ids)).all()
+            user_map = {u.userID: u.email for u in users}
+
+        return jsonify({
+            "logs": [
+                {
+                    "logID": log.logID,
+                    "timestamp": log.timestamp.isoformat() if log.timestamp else None,
+                    "userID": log.userID,
+                    "userEmail": user_map.get(log.userID),
+                    "action": log.action,
+                    "resource_type": log.resource_type,
+                    "resource_id": log.resource_id,
+                    "details": json.loads(log.details) if log.details else None,
+                    "ip_address": log.ip_address,
+                }
+                for log in logs
+            ],
+            "total": total,
+            "page": page,
+            "per_page": per_page,
+        }), 200
+    except Exception as e:
+        app.logger.exception("/audit-logs failed")
+        return jsonify({"error": str(e)}), 500
+
+
 # --- Gemini Agentic Chatbot Route ---
 import google.generativeai as genai
 from sqlalchemy import text as sql_text
-import json
-import re
 
 # Dangerous SQL patterns that should never be allowed
 BLOCKED_SQL_PATTERNS = [
@@ -1969,6 +2172,12 @@ def chat_endpoint():
                     final_text = "I processed your request but couldn't generate a text response."
 
                 app.logger.info(f"Chat succeeded with model: {model_name}")
+                record_audit("CHAT", "chat",
+                              details={"model": model_name,
+                                       "actions_count": len(actions_taken),
+                                       "message_preview": message[:100]},
+                              user_id=user.userID, org_id=org_id)
+                db.session.commit()
                 return jsonify({
                     "response": final_text,
                     "actions": actions_taken,
@@ -1994,4 +2203,6 @@ def chat_endpoint():
         return jsonify({"error": str(e)}), 500
 
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(host='0.0.0.0', port=5001, debug=True)

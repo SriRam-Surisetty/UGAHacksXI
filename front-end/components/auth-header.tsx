@@ -21,6 +21,7 @@ const navItems = [
     { label: 'Stock', route: '/Stock' },
     { label: 'Inventory', route: '/Inventory' },
     { label: 'Users', route: '/Users' },
+    { label: 'Audit Logs', route: '/AuditLogs' },
     { label: 'Support', route: '/Support' },
 ];
 
@@ -115,7 +116,7 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
 
     const visibleNavItems = roleName.toLowerCase() === 'admin'
         ? navItems
-        : navItems.filter((item) => item.route !== '/Users');
+        : navItems.filter((item) => item.route !== '/Users' && item.route !== '/AuditLogs');
 
     return (
         <View style={styles.container}>

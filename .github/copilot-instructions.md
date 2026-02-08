@@ -29,10 +29,13 @@
 - The UI theme palette lives in `front-end/constants/theme.ts` and is referenced directly in styles.
 
 ## Integration Points
-- Backend models map to tables: `orgs`, `users`, `dishes`, `ing`, and `dish_ing` (`back-end/app.py`).
+- Backend models map to tables: `orgs`, `users`, `dishes`, `ing`, `dish_ing`, and `audit_logs` (`back-end/app.py`).
 - Inventory endpoints include:
   - `GET /inventory/dishes`
   - `GET /inventory/ingredients`
   - `GET /inventory/dishes/<id>`
   - `POST /inventory/ingredient-types`
 - The Gemini chatbot endpoint is `POST /chat` with `{ "message": "..." }`.
+- Audit logging: every mutating action (create, update, delete, login, import, export, consume, chat) is recorded in the `audit_logs` table via `record_audit()`.
+  - `GET /audit-logs` returns paginated audit logs (admin only). Supports `?action=`, `?resource_type=`, `?page=`, `?per_page=` query params.
+  - The Audit Logs UI is at `front-end/app/AuditLogs.tsx` (admin only, linked from the nav header).

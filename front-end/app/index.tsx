@@ -61,8 +61,11 @@ function MobileUI() {
                 <View style={styles.featuresSection}>
                     <Text style={styles.footerText}>Trusted by modern businesses</Text>
                     <View style={styles.footerLinks}>
-                        <TouchableOpacity><Text style={styles.linkText}>Pricing</Text></TouchableOpacity>
-                        <TouchableOpacity><Text style={styles.linkText}>Contact</Text></TouchableOpacity>
+                        <Link href="/Price" asChild>
+                            <TouchableOpacity>
+                                <Text style={styles.webFooterLink}>Pricing</Text>
+                            </TouchableOpacity>
+                        </Link>                        <TouchableOpacity><Text style={styles.linkText}>Contact</Text></TouchableOpacity>
                         <TouchableOpacity><Text style={styles.linkText}>Terms</Text></TouchableOpacity>
                     </View>
                 </View>
@@ -151,8 +154,11 @@ function WebUI() {
                 <View style={styles.webFooter}>
                     <Text style={styles.webFooterText}>Trusted by modern businesses worldwide</Text>
                     <View style={styles.webFooterLinks}>
-                        <TouchableOpacity><Text style={styles.webFooterLink}>Pricing</Text></TouchableOpacity>
-                        <Text style={styles.webFooterDivider}>•</Text>
+                        <Link href="/Price" asChild>
+                            <TouchableOpacity>
+                                <Text style={styles.webFooterLink}>Pricing</Text>
+                            </TouchableOpacity>
+                        </Link>                        <Text style={styles.webFooterDivider}>•</Text>
                         <TouchableOpacity><Text style={styles.webFooterLink}>Contact</Text></TouchableOpacity>
                         <Text style={styles.webFooterDivider}>•</Text>
                         <TouchableOpacity><Text style={styles.webFooterLink}>Terms</Text></TouchableOpacity>

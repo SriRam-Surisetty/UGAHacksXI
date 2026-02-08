@@ -37,25 +37,19 @@ _DB_HOST = os.getenv("DB_HOST", "db-mysql-nyc3-02019-do-user-33079250-0.j.db.ond
 _DB_PORT = os.getenv("DB_PORT", "25060")
 _DB_NAME = os.getenv("DB_NAME", "defaultdb")
 
-# Build the DB URI — use the CA cert file when present (local dev), else use
-# ssl_verify_cert=true which trusts the system CA store (works on App Platform).
-_db_base = f"mysql+mysqlconnector://{_DB_USER}:{_DB_PASS}@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}"
-if os.path.isfile(CA_CERT_PATH):
-    _db_uri = f"{_db_base}?ssl_ca={CA_CERT_PATH}"
-else:
-    _db_uri = f"{_db_base}?ssl_verify_cert=true"
-
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", _db_uri)
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
+    "DATABASE_URL",
+    f"mysql+mysqlconnector://{_DB_USER}:{_DB_PASS}@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}"
+    f"?ssl_ca={CA_CERT_PATH}",
+)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secure-uga-hacks-key")
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
-_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:8081")
-_cors_origin_list = [o.strip() for o in _cors_origins.split(",") if o.strip()]
 CORS(
     app,
-    resources={r"/*": {"origins": _cors_origin_list}},
+    resources={r"/*": {"origins": ["http://localhost:8081"]}},
     supports_credentials=True,
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
@@ -3341,10 +3335,7 @@ def vendors_order_export_csv():
         return jsonify({"error": str(e)}), 500
 
 
-# Ensure DB tables exist (safe to call repeatedly; no-op if tables already exist)
-with app.app_context():
-    db.create_all()
-
-
 if __name__ == '__main__':
+    with app.app_context():
+        db.create_all()
     app.run(host='0.0.0.0', port=5001, debug=True)

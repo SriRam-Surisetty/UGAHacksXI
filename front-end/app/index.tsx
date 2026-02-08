@@ -7,18 +7,16 @@ import FloatingChatButton from '@/components/FloatingChatButton';
 
 const { width } = Dimensions.get('window');
 
-export default function LandingPage() {
-
+// Mobile UI Component (iOS)
+function MobileUI() {
     return (
         <SafeAreaView style={styles.container}>
             <View style={styles.backgroundBase} />
-            {/* Background Orbs */}
             <View style={styles.orbTop} />
             <View style={styles.orbBottom} />
             <View style={styles.gridOverlay} />
 
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-                {/* Navigation Header */}
                 <View style={styles.header}>
                     <Text style={styles.logo}>StockSense</Text>
                     <Link href="/login" asChild>
@@ -28,7 +26,6 @@ export default function LandingPage() {
                     </Link>
                 </View>
 
-                {/* Hero Section */}
                 <View style={styles.heroSection}>
                     <View style={styles.badgeContainer}>
                         <Text style={styles.badgeText}>AI-Powered Intelligence</Text>
@@ -53,7 +50,6 @@ export default function LandingPage() {
                     </View>
                 </View>
 
-                {/* Dashboard Preview (Abstract Representation) */}
                 <View style={styles.previewContainer}>
                     <View style={styles.previewCard}>
                         <View style={styles.previewHeader}>
@@ -69,7 +65,6 @@ export default function LandingPage() {
                     </View>
                 </View>
 
-                {/* Features / Footer */}
                 <View style={styles.featuresSection}>
                     <Text style={styles.footerText}>Trusted by modern businesses</Text>
                     <View style={styles.footerLinks}>
@@ -78,12 +73,94 @@ export default function LandingPage() {
                         <TouchableOpacity><Text style={styles.linkText}>Terms</Text></TouchableOpacity>
                     </View>
                 </View>
-
             </ScrollView>
 
             <FloatingChatButton />
         </SafeAreaView>
     );
+}
+
+// Web UI Component (Desktop-optimized)
+function WebUI() {
+    return (
+        <SafeAreaView style={styles.webContainer}>
+            <ScrollView contentContainerStyle={styles.webScrollContent} showsVerticalScrollIndicator={false}>
+                {/* Simple Header */}
+                <View style={styles.webHeader}>
+                    <Text style={styles.webLogo}>StockSense</Text>
+                    <View style={styles.webNav}>
+                        <Link href="/login" asChild>
+                            <TouchableOpacity style={styles.webLoginButton}>
+                                <Text style={styles.webLoginText}>Login</Text>
+                            </TouchableOpacity>
+                        </Link>
+                    </View>
+                </View>
+
+                {/* Hero Section */}
+                <View style={styles.webHero}>
+                    <View style={styles.webBadge}>
+                        <Text style={styles.webBadgeText}>✨ AI-POWERED INTELLIGENCE</Text>
+                    </View>
+
+                    <Text style={styles.webHeroTitle}>
+                        The Future of <Text style={styles.webHeroTitleAccent}>Waste Prevention</Text>
+                    </Text>
+
+                    <Text style={styles.webHeroDescription}>
+                        Harness advanced AI to predict stockouts, eliminate waste, and maximize profit.{'\n'}
+                        Transform your inventory into intelligent, self-optimizing systems.
+                    </Text>
+
+                    <Link href="/signup" asChild>
+                        <TouchableOpacity style={styles.webCTA}>
+                            <Text style={styles.webCTAText}>Get Started Free</Text>
+                            <Ionicons name="arrow-forward" size={20} color="#fff" style={{ marginLeft: 8 }} />
+                        </TouchableOpacity>
+                    </Link>
+
+                    {/* Features Grid */}
+                    <View style={styles.webFeaturesGrid}>
+                        <View style={styles.webFeatureCard}>
+                            <Ionicons name="analytics" size={32} color={Colors.landing.primaryPurple} />
+                            <Text style={styles.webFeatureTitle}>Smart Analytics</Text>
+                            <Text style={styles.webFeatureText}>Real-time insights powered by AI</Text>
+                        </View>
+                        <View style={styles.webFeatureCard}>
+                            <Ionicons name="trending-up" size={32} color={Colors.landing.primaryPurple} />
+                            <Text style={styles.webFeatureTitle}>Predictive Alerts</Text>
+                            <Text style={styles.webFeatureText}>Prevent stockouts before they happen</Text>
+                        </View>
+                        <View style={styles.webFeatureCard}>
+                            <Ionicons name="leaf" size={32} color={Colors.landing.primaryPurple} />
+                            <Text style={styles.webFeatureTitle}>Waste Reduction</Text>
+                            <Text style={styles.webFeatureText}>Minimize loss, maximize profit</Text>
+                        </View>
+                    </View>
+                </View>
+
+                {/* Footer */}
+                <View style={styles.webFooter}>
+                    <Text style={styles.webFooterText}>Trusted by modern businesses worldwide</Text>
+                    <View style={styles.webFooterLinks}>
+                        <TouchableOpacity><Text style={styles.webFooterLink}>Pricing</Text></TouchableOpacity>
+                        <Text style={styles.webFooterDivider}>•</Text>
+                        <TouchableOpacity><Text style={styles.webFooterLink}>Contact</Text></TouchableOpacity>
+                        <Text style={styles.webFooterDivider}>•</Text>
+                        <TouchableOpacity><Text style={styles.webFooterLink}>Terms</Text></TouchableOpacity>
+                    </View>
+                </View>
+            </ScrollView>
+
+            <FloatingChatButton />
+        </SafeAreaView>
+    );
+}
+
+export default function LandingPage() {
+    const isWeb = Platform.OS === 'web';
+
+    return isWeb ? <WebUI /> : <MobileUI />;
 }
 
 const styles = StyleSheet.create({
@@ -287,5 +364,172 @@ const styles = StyleSheet.create({
         fontSize: 14,
         color: Colors.landing.primaryPurple,
         fontWeight: '500',
+    },
+
+    // Web-specific styles (Desktop-optimized)
+    webContainer: {
+        flex: 1,
+        backgroundColor: '#ffffff',
+    },
+    webScrollContent: {
+        paddingBottom: 60,
+    },
+    webHeader: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: 80,
+        paddingVertical: 24,
+        backgroundColor: '#ffffff',
+        borderBottomWidth: 1,
+        borderBottomColor: '#f0f0f0',
+    },
+    webLogo: {
+        fontSize: 28,
+        fontWeight: 'bold',
+        color: Colors.landing.primaryPurple,
+    },
+    webNav: {
+        flexDirection: 'row',
+        gap: 24,
+    },
+    webLoginButton: {
+        paddingHorizontal: 24,
+        paddingVertical: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: Colors.landing.primaryPurple,
+    },
+    webLoginText: {
+        color: Colors.landing.primaryPurple,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    webHero: {
+        alignItems: 'center',
+        paddingHorizontal: 80,
+        paddingVertical: 80,
+        maxWidth: 1200,
+        alignSelf: 'center',
+        width: '100%',
+    },
+    webBadge: {
+        paddingHorizontal: 16,
+        paddingVertical: 8,
+        borderRadius: 20,
+        backgroundColor: Colors.landing.lightPurple,
+        marginBottom: 32,
+    },
+    webBadgeText: {
+        fontSize: 12,
+        fontWeight: '700',
+        color: Colors.landing.accentPurple,
+        letterSpacing: 1.5,
+    },
+    webHeroTitle: {
+        fontSize: 64,
+        fontWeight: '800',
+        color: Colors.landing.black,
+        textAlign: 'center',
+        marginBottom: 24,
+        lineHeight: 72,
+    },
+    webHeroTitleAccent: {
+        color: Colors.landing.primaryPurple,
+    },
+    webHeroDescription: {
+        fontSize: 20,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 32,
+        marginBottom: 48,
+        maxWidth: 700,
+    },
+    webCTA: {
+        backgroundColor: Colors.landing.primaryPurple,
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingHorizontal: 36,
+        paddingVertical: 18,
+        borderRadius: 12,
+        shadowColor: Colors.landing.primaryPurple,
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.3,
+        shadowRadius: 12,
+        elevation: 8,
+        marginBottom: 80,
+        ...(Platform.OS === 'web' && {
+            cursor: 'pointer',
+            transition: 'all 0.2s ease',
+        } as any),
+    },
+    webCTAText: {
+        color: '#fff',
+        fontSize: 18,
+        fontWeight: '700',
+    },
+    webFeaturesGrid: {
+        flexDirection: 'row',
+        gap: 32,
+        width: '100%',
+        maxWidth: 1000,
+        flexWrap: 'wrap',
+        justifyContent: 'center',
+    },
+    webFeatureCard: {
+        flex: 1,
+        minWidth: 280,
+        maxWidth: 320,
+        backgroundColor: '#ffffff',
+        padding: 32,
+        borderRadius: 16,
+        borderWidth: 1,
+        borderColor: '#f0f0f0',
+        alignItems: 'center',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.05,
+        shadowRadius: 12,
+        elevation: 2,
+    },
+    webFeatureTitle: {
+        fontSize: 20,
+        fontWeight: '700',
+        color: Colors.landing.black,
+        marginTop: 16,
+        marginBottom: 8,
+    },
+    webFeatureText: {
+        fontSize: 15,
+        color: '#666',
+        textAlign: 'center',
+        lineHeight: 22,
+    },
+    webFooter: {
+        alignItems: 'center',
+        paddingVertical: 40,
+        borderTopWidth: 1,
+        borderTopColor: '#f0f0f0',
+        marginTop: 40,
+    },
+    webFooterText: {
+        fontSize: 14,
+        color: '#999',
+        marginBottom: 16,
+    },
+    webFooterLinks: {
+        flexDirection: 'row',
+        gap: 16,
+        alignItems: 'center',
+    },
+    webFooterLink: {
+        fontSize: 14,
+        color: Colors.landing.primaryPurple,
+        fontWeight: '500',
+    },
+    webFooterDivider: {
+        fontSize: 14,
+        color: '#ddd',
     },
 });

@@ -8,6 +8,7 @@ import AuthHeader from '@/components/auth-header';
 import FloatingChatButton from '@/components/FloatingChatButton';
 import api from '@/services/api';
 import { getUserProfile, saveUserProfile } from '@/services/storage';
+import { exportSpreadsheet, importSpreadsheet } from '@/services/spreadsheet';
 
 type UserRow = {
     userID: number;
@@ -224,6 +225,25 @@ export default function Users() {
                         <Text style={styles.title}>Users</Text>
                         <Text style={styles.subtitle}>Add team members and manage access by role.</Text>
                     </View>
+                    <View style={styles.headerActions}>
+                        <TouchableOpacity
+                            style={styles.btnSecondary}
+                            onPress={() => exportSpreadsheet('/export/users', 'users.csv')}
+                        >
+                            <Ionicons name="download-outline" size={14} color="#374151" style={{ marginRight: 4 }} />
+                            <Text style={styles.btnSecondaryText}>Export CSV</Text>
+                        </TouchableOpacity>
+                        <TouchableOpacity
+                            style={styles.btnSecondary}
+                            onPress={async () => {
+                                const result = await importSpreadsheet('/import/users');
+                                if (result) setRefreshKey((prev) => prev + 1);
+                            }}
+                        >
+                            <Ionicons name="cloud-upload-outline" size={14} color="#374151" style={{ marginRight: 4 }} />
+                            <Text style={styles.btnSecondaryText}>Import CSV</Text>
+                        </TouchableOpacity>
+                    </View>
                 </View>
 
                 {notice && (
@@ -376,7 +396,7 @@ export default function Users() {
                             </View>
                         </View>
                         <View style={styles.modalActions}>
-                            <TouchableOpacity style={styles.btnSecondary} onPress={closeEditModal} disabled={isEditing}>
+                            <TouchableOpacity style={[styles.btnSecondary, { flex: 1, justifyContent: 'center' }]} onPress={closeEditModal} disabled={isEditing}>
                                 <Text style={styles.btnSecondaryText}>Cancel</Text>
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.btnPrimary} onPress={handleEditUser} disabled={isEditing}>
@@ -406,6 +426,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         justifyContent: 'space-between',
         alignItems: 'center',
+        flexWrap: 'wrap',
+        gap: 12,
+    },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+        flexWrap: 'wrap',
     },
     title: {
         fontSize: 28,
@@ -602,10 +630,11 @@ const styles = StyleSheet.create({
         marginTop: 4,
     },
     btnSecondary: {
-        flex: 1,
-        paddingVertical: 12,
-        borderRadius: 8,
+        flexDirection: 'row',
         alignItems: 'center',
+        paddingVertical: 12,
+        paddingHorizontal: 16,
+        borderRadius: 8,
         borderWidth: 1,
         borderColor: '#d1d5db',
     },

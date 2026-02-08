@@ -1,10 +1,12 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, Response
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
 from sqlalchemy import func, or_, and_
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
+import io
+import csv
 import logging
 from dotenv import load_dotenv
 from datetime import datetime
@@ -1232,6 +1234,383 @@ def consume_stock_for_dish():
         db.session.rollback()
         app.logger.exception("/stock/consume failed")
         return jsonify({"error": str(e)}), 500
+
+# --- Spreadsheet Export / Import Routes ---
+
+
+def make_csv_response(rows, headers, filename):
+    """Build a CSV Response from a list of dicts."""
+    output = io.StringIO()
+    writer = csv.DictWriter(output, fieldnames=headers, extrasaction="ignore")
+    writer.writeheader()
+    for row in rows:
+        writer.writerow(row)
+    content = output.getvalue()
+    return Response(
+        content,
+        mimetype="text/csv",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
+def parse_csv_upload():
+    """Return list[dict] from an uploaded CSV file, or (None, error_response)."""
+    if "file" not in request.files:
+        return None, (jsonify({"error": "No file uploaded"}), 400)
+    file = request.files["file"]
+    if not file.filename:
+        return None, (jsonify({"error": "Empty filename"}), 400)
+    if not file.filename.lower().endswith(".csv"):
+        return None, (jsonify({"error": "Only .csv files are supported"}), 400)
+    try:
+        stream = io.StringIO(file.stream.read().decode("utf-8-sig"))
+        reader = csv.DictReader(stream)
+        rows = list(reader)
+        return rows, None
+    except Exception as exc:
+        return None, (jsonify({"error": f"Unable to parse CSV: {exc}"}), 400)
+
+
+# ---- Ingredients export / import ----
+
+@app.route("/export/ingredients", methods=["GET"])
+@jwt_required()
+def export_ingredients():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        ingredients = Ingredient.query.filter(
+            Ingredient.orgID == user.orgID,
+            Ingredient.expiry.is_(None),
+            Ingredient.batchNum.is_(None),
+        ).order_by(Ingredient.ingName.asc()).all()
+        rows = [{"ingName": i.ingName, "category": i.category or ""} for i in ingredients]
+        return make_csv_response(rows, ["ingName", "category"], "ingredients.csv")
+    except Exception as e:
+        app.logger.exception("/export/ingredients failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/import/ingredients", methods=["POST"])
+@jwt_required()
+def import_ingredients():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        rows, err = parse_csv_upload()
+        if err:
+            return err
+        created = 0
+        skipped = 0
+        for row in rows:
+            ing_name = (row.get("ingName") or row.get("name") or "").strip()
+            if not ing_name:
+                skipped += 1
+                continue
+            existing = Ingredient.query.filter(
+                Ingredient.orgID == user.orgID,
+                Ingredient.ingName == ing_name,
+                Ingredient.expiry.is_(None),
+                Ingredient.batchNum.is_(None),
+            ).first()
+            if existing:
+                skipped += 1
+                continue
+            db.session.add(Ingredient(
+                ingName=ing_name,
+                category=(row.get("category") or "").strip() or None,
+                expiry=None,
+                batchNum=None,
+                orgID=user.orgID,
+            ))
+            created += 1
+        db.session.commit()
+        return jsonify({"msg": f"{created} ingredients imported, {skipped} skipped"}), 201
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("/import/ingredients failed")
+        return jsonify({"error": str(e)}), 500
+
+
+# ---- Dishes export / import ----
+
+@app.route("/export/dishes", methods=["GET"])
+@jwt_required()
+def export_dishes():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        dishes = Dish.query.filter(
+            Dish.orgID == user.orgID,
+            Dish.dishName != STOCK_DISH_NAME,
+        ).order_by(Dish.dishName.asc()).all()
+        rows = []
+        for dish in dishes:
+            links = (
+                db.session.query(DishIngredient, Ingredient)
+                .join(Ingredient, Ingredient.ingID == DishIngredient.ingID)
+                .filter(DishIngredient.dishID == dish.dishID)
+                .all()
+            )
+            if links:
+                for link, ing in links:
+                    rows.append({
+                        "dishName": dish.dishName,
+                        "ingName": ing.ingName,
+                        "qty": float(link.qty) if link.qty is not None else "",
+                        "unit": link.unit or "",
+                    })
+            else:
+                rows.append({"dishName": dish.dishName, "ingName": "", "qty": "", "unit": ""})
+        return make_csv_response(rows, ["dishName", "ingName", "qty", "unit"], "dishes.csv")
+    except Exception as e:
+        app.logger.exception("/export/dishes failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/import/dishes", methods=["POST"])
+@jwt_required()
+def import_dishes():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        rows, err = parse_csv_upload()
+        if err:
+            return err
+        dishes_map: dict[str, list] = {}
+        for row in rows:
+            dish_name = (row.get("dishName") or row.get("name") or "").strip()
+            if not dish_name or dish_name == STOCK_DISH_NAME:
+                continue
+            dishes_map.setdefault(dish_name, [])
+            ing_name = (row.get("ingName") or "").strip()
+            if ing_name:
+                dishes_map[dish_name].append({
+                    "ingName": ing_name,
+                    "qty": row.get("qty", ""),
+                    "unit": row.get("unit", ""),
+                })
+        created = 0
+        skipped = 0
+        for dish_name, ingredients in dishes_map.items():
+            existing = Dish.query.filter(
+                Dish.orgID == user.orgID,
+                Dish.dishName == dish_name,
+            ).first()
+            if existing:
+                skipped += 1
+                continue
+            new_dish = Dish(dishName=dish_name, orgID=user.orgID)
+            db.session.add(new_dish)
+            db.session.flush()
+            for ing_info in ingredients:
+                master = Ingredient.query.filter(
+                    Ingredient.orgID == user.orgID,
+                    Ingredient.ingName == ing_info["ingName"],
+                    Ingredient.expiry.is_(None),
+                    Ingredient.batchNum.is_(None),
+                ).first()
+                if master:
+                    qty_val = None
+                    try:
+                        qty_val = Decimal(str(ing_info["qty"])) if ing_info["qty"] else None
+                    except (InvalidOperation, ValueError):
+                        pass
+                    db.session.add(DishIngredient(
+                        dishID=new_dish.dishID,
+                        ingID=master.ingID,
+                        qty=qty_val,
+                        unit=ing_info["unit"] or None,
+                    ))
+            created += 1
+        db.session.commit()
+        return jsonify({"msg": f"{created} dishes imported, {skipped} skipped"}), 201
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("/import/dishes failed")
+        return jsonify({"error": str(e)}), 500
+
+
+# ---- Stock batches export / import ----
+
+@app.route("/export/stock", methods=["GET"])
+@jwt_required()
+def export_stock():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        stock_dish = Dish.query.filter(
+            Dish.orgID == user.orgID,
+            Dish.dishName == STOCK_DISH_NAME,
+        ).first()
+        stock_dish_id = stock_dish.dishID if stock_dish else None
+        batches = Ingredient.query.filter(
+            Ingredient.orgID == user.orgID,
+            or_(Ingredient.expiry.isnot(None), Ingredient.batchNum.isnot(None)),
+        ).order_by(Ingredient.ingName.asc()).all()
+        qty_map = {}
+        if stock_dish_id and batches:
+            ids = [b.ingID for b in batches]
+            qty_rows = DishIngredient.query.filter(
+                DishIngredient.dishID == stock_dish_id,
+                DishIngredient.ingID.in_(ids),
+            ).all()
+            qty_map = {r.ingID: {"qty": float(r.qty) if r.qty else "", "unit": r.unit or ""} for r in qty_rows}
+        rows = []
+        for b in batches:
+            q = qty_map.get(b.ingID, {})
+            rows.append({
+                "ingName": b.ingName,
+                "category": b.category or "",
+                "batchNum": b.batchNum or "",
+                "expiry": b.expiry.isoformat() if b.expiry else "",
+                "qty": q.get("qty", ""),
+                "unit": q.get("unit", ""),
+            })
+        return make_csv_response(rows, ["ingName", "category", "batchNum", "expiry", "qty", "unit"], "stock.csv")
+    except Exception as e:
+        app.logger.exception("/export/stock failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/import/stock", methods=["POST"])
+@jwt_required()
+def import_stock():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        rows, err = parse_csv_upload()
+        if err:
+            return err
+        created = 0
+        skipped = 0
+        for row in rows:
+            ing_name = (row.get("ingName") or row.get("name") or "").strip()
+            if not ing_name:
+                skipped += 1
+                continue
+            master = Ingredient.query.filter(
+                Ingredient.orgID == user.orgID,
+                Ingredient.ingName == ing_name,
+                Ingredient.expiry.is_(None),
+                Ingredient.batchNum.is_(None),
+            ).first()
+            if not master:
+                skipped += 1
+                continue
+            expiry_str = (row.get("expiry") or "").strip()
+            batch_num = (row.get("batchNum") or "").strip() or None
+            expiry = None
+            if expiry_str:
+                try:
+                    expiry = datetime.strptime(expiry_str, "%Y-%m-%d").date()
+                except ValueError:
+                    skipped += 1
+                    continue
+            if not expiry and not batch_num:
+                skipped += 1
+                continue
+            qty_str = (row.get("qty") or "").strip()
+            unit_str = (row.get("unit") or "").strip()
+            if not qty_str or not unit_str:
+                skipped += 1
+                continue
+            try:
+                qty = Decimal(qty_str)
+            except (InvalidOperation, ValueError):
+                skipped += 1
+                continue
+            new_batch = Ingredient(
+                ingName=master.ingName,
+                category=master.category,
+                expiry=expiry,
+                batchNum=batch_num,
+                orgID=user.orgID,
+            )
+            db.session.add(new_batch)
+            db.session.flush()
+            stock_dish = get_or_create_stock_dish(user.orgID)
+            db.session.add(DishIngredient(
+                dishID=stock_dish.dishID,
+                ingID=new_batch.ingID,
+                qty=qty,
+                unit=unit_str,
+            ))
+            created += 1
+        db.session.commit()
+        return jsonify({"msg": f"{created} batches imported, {skipped} skipped"}), 201
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("/import/stock failed")
+        return jsonify({"error": str(e)}), 500
+
+
+# ---- Users export / import ----
+
+@app.route("/export/users", methods=["GET"])
+@jwt_required()
+def export_users():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        if user.uRole != "admin":
+            return jsonify({"error": "Forbidden"}), 403
+        users = User.query.filter(User.orgID == user.orgID).order_by(User.email.asc()).all()
+        rows = [{"email": u.email, "role": u.uRole} for u in users]
+        return make_csv_response(rows, ["email", "role"], "users.csv")
+    except Exception as e:
+        app.logger.exception("/export/users failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/import/users", methods=["POST"])
+@jwt_required()
+def import_users():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+        if user.uRole != "admin":
+            return jsonify({"error": "Forbidden"}), 403
+        rows, err = parse_csv_upload()
+        if err:
+            return err
+        created = 0
+        skipped = 0
+        for row in rows:
+            email = (row.get("email") or "").strip()
+            password = (row.get("password") or "").strip()
+            role = (row.get("role") or "manager").strip().lower()
+            if not email or not password:
+                skipped += 1
+                continue
+            if role not in {"admin", "manager"}:
+                role = "manager"
+            existing = User.query.filter_by(email=email).first()
+            if existing:
+                skipped += 1
+                continue
+            db.session.add(User(
+                email=email,
+                hashed_pwd=generate_password_hash(password),
+                orgID=user.orgID,
+                uRole=role,
+            ))
+            created += 1
+        db.session.commit()
+        return jsonify({"msg": f"{created} users imported, {skipped} skipped"}), 201
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("/import/users failed")
+        return jsonify({"error": str(e)}), 500
+
 
 # --- Gemini Agentic Chatbot Route ---
 import google.generativeai as genai

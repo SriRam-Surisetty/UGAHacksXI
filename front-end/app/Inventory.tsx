@@ -7,6 +7,7 @@ import AuthHeader from '@/components/auth-header';
 import FloatingChatButton from '@/components/FloatingChatButton';
 import FoodThumbnail from '@/components/FoodThumbnail';
 import api from '@/services/api';
+import { exportSpreadsheet, importSpreadsheet } from '@/services/spreadsheet';
 
 type DishRow = {
 	id: number;
@@ -383,12 +384,36 @@ export default function Inventory() {
 							<Text style={styles.title}>Master Inventory</Text>
 							<Text style={styles.subtitle}>Configure global item types and recipe relationships</Text>
 						</View>
-						<TouchableOpacity
-							style={styles.primaryButton}
-							onPress={() => openModal(activeTab === 'dishes' ? 'dish' : 'ingredient')}
-						>
-							<Text style={styles.primaryButtonText}>{addLabel}</Text>
-						</TouchableOpacity>
+						<View style={styles.headerActions}>
+							<TouchableOpacity
+								style={styles.secondaryButton}
+								onPress={() => exportSpreadsheet(
+									activeTab === 'dishes' ? '/export/dishes' : '/export/ingredients',
+									activeTab === 'dishes' ? 'dishes.csv' : 'ingredients.csv'
+								)}
+							>
+								<Ionicons name="download-outline" size={14} color="#374151" style={{ marginRight: 4 }} />
+								<Text style={styles.secondaryButtonText}>Export CSV</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.secondaryButton}
+								onPress={async () => {
+									const result = await importSpreadsheet(
+										activeTab === 'dishes' ? '/import/dishes' : '/import/ingredients'
+									);
+									if (result) setRefreshKey((prev) => prev + 1);
+								}}
+							>
+								<Ionicons name="cloud-upload-outline" size={14} color="#374151" style={{ marginRight: 4 }} />
+								<Text style={styles.secondaryButtonText}>Import CSV</Text>
+							</TouchableOpacity>
+							<TouchableOpacity
+								style={styles.primaryButton}
+								onPress={() => openModal(activeTab === 'dishes' ? 'dish' : 'ingredient')}
+							>
+								<Text style={styles.primaryButtonText}>{addLabel}</Text>
+							</TouchableOpacity>
+						</View>
 					</View>
 
 					<View style={styles.tabRow}>
@@ -438,19 +463,19 @@ export default function Inventory() {
 							</TouchableOpacity>
 						</View>
 						{activeTab === 'ingredients' && showCategoryMenu && (
-							<View style={styles.categoryMenu}>
+							<View style={styles.dropdownMenu}>
 								{categoryOptions.map((option) => {
 									const isActive = option === categoryLabel;
 									return (
 										<TouchableOpacity
 											key={option}
-											style={[styles.categoryOption, isActive && styles.categoryOptionActive]}
+											style={[styles.dropdownOption, isActive && styles.dropdownOptionActive]}
 											onPress={() => {
 												setCategory(option === 'All Categories' ? '' : option);
 												setShowCategoryMenu(false);
 											}}
 										>
-											<Text style={[styles.categoryOptionText, isActive && styles.categoryOptionTextActive]}>
+											<Text style={[styles.dropdownOptionText, isActive && styles.dropdownOptionTextActive]}>
 												{option}
 											</Text>
 										</TouchableOpacity>
@@ -568,10 +593,10 @@ export default function Inventory() {
 										{[5, 10, 25, 50].map((n) => (
 											<TouchableOpacity
 												key={n}
-												style={[styles.perPageOption, n === itemsPerPage && styles.perPageOptionActive]}
+												style={[styles.dropdownOption, n === itemsPerPage && styles.dropdownOptionActive]}
 												onPress={() => { setItemsPerPage(n); setShowPerPageMenu(false); }}
 											>
-												<Text style={[styles.perPageOptionText, n === itemsPerPage && styles.perPageOptionTextActive]}>{n}</Text>
+												<Text style={[styles.dropdownOptionText, n === itemsPerPage && styles.dropdownOptionTextActive]}>{n}</Text>
 											</TouchableOpacity>
 										))}
 									</View>
@@ -801,6 +826,12 @@ const styles = StyleSheet.create({
 		flexWrap: 'wrap',
 		marginBottom: 24,
 	},
+	headerActions: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 10,
+		flexWrap: 'wrap',
+	},
 	title: {
 		fontSize: 24,
 		fontWeight: '600',
@@ -823,6 +854,8 @@ const styles = StyleSheet.create({
 		fontWeight: '600',
 	},
 	secondaryButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
 		paddingHorizontal: 16,
 		paddingVertical: 10,
 		borderRadius: 6,
@@ -996,7 +1029,7 @@ const styles = StyleSheet.create({
 		fontVariant: ['tabular-nums'],
 		fontWeight: '600',
 	},
-	categoryMenu: {
+	dropdownMenu: {
 		marginTop: 12,
 		backgroundColor: Colors.landing.white,
 		borderRadius: 8,
@@ -1004,20 +1037,21 @@ const styles = StyleSheet.create({
 		borderColor: '#e5e7eb',
 		overflow: 'hidden',
 	},
-	categoryOption: {
+	dropdownOption: {
 		paddingVertical: 10,
 		paddingHorizontal: 12,
 	},
-	categoryOptionActive: {
+	dropdownOptionActive: {
 		backgroundColor: Colors.landing.lightPurple,
 	},
-	categoryOptionText: {
+	dropdownOptionText: {
 		fontSize: 13,
 		color: '#374151',
 		fontWeight: '500',
 	},
-	categoryOptionTextActive: {
+	dropdownOptionTextActive: {
 		color: Colors.landing.primaryPurple,
+		fontWeight: '600',
 	},
 	modalOverlay: {
 		flex: 1,
@@ -1274,19 +1308,5 @@ const styles = StyleSheet.create({
 		elevation: 4,
 		zIndex: 10,
 	},
-	perPageOption: {
-		paddingVertical: 8,
-		paddingHorizontal: 16,
-	},
-	perPageOptionActive: {
-		backgroundColor: Colors.landing.lightPurple,
-	},
-	perPageOptionText: {
-		fontSize: 12,
-		color: '#374151',
-	},
-	perPageOptionTextActive: {
-		color: Colors.landing.primaryPurple,
-		fontWeight: '600',
-	},
+
 });

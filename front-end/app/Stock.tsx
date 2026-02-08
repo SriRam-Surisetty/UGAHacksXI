@@ -17,6 +17,7 @@ import AuthHeader from '@/components/auth-header';
 import FloatingChatButton from '@/components/FloatingChatButton';
 import FoodThumbnail from '@/components/FoodThumbnail';
 import api from '@/services/api';
+import { exportSpreadsheet, importSpreadsheet } from '@/services/spreadsheet';
 
 type Batch = {
     id: number;
@@ -335,6 +336,23 @@ export default function Stock() {
                             <Text style={styles.subtitle}>Manage stock by batch and expiry date</Text>
                         </View>
                         <View style={styles.headerActions}>
+                            <TouchableOpacity
+                                style={styles.secondaryButton}
+                                onPress={() => exportSpreadsheet('/export/stock', 'stock.csv')}
+                            >
+                                <Ionicons name="download-outline" size={14} color="#374151" style={{ marginRight: 4 }} />
+                                <Text style={styles.secondaryButtonText}>Export CSV</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.secondaryButton}
+                                onPress={async () => {
+                                    const result = await importSpreadsheet('/import/stock');
+                                    if (result) setRefreshKey((prev) => prev + 1);
+                                }}
+                            >
+                                <Ionicons name="cloud-upload-outline" size={14} color="#374151" style={{ marginRight: 4 }} />
+                                <Text style={styles.secondaryButtonText}>Import CSV</Text>
+                            </TouchableOpacity>
                             <TouchableOpacity style={styles.primaryButton} onPress={() => openModal('add')}>
                                 <Text style={styles.primaryButtonText}>Add Batch</Text>
                             </TouchableOpacity>
@@ -382,7 +400,7 @@ export default function Stock() {
                                     )}
                                 </View>
                             </View>
-                            <TouchableOpacity style={styles.selectButton} onPress={() => setStatusPickerOpen(true)}>
+                            <TouchableOpacity style={styles.selectButton} onPress={() => setStatusPickerOpen((prev) => !prev)}>
                                 <Ionicons name="filter" size={14} color="#6b7280" />
                                 <Text style={styles.selectText}>{statusLabel}</Text>
                                 <Ionicons name="chevron-down" size={14} color="#6b7280" />
@@ -402,6 +420,27 @@ export default function Stock() {
                                 <Text style={styles.secondaryButtonText}>Clear</Text>
                             </TouchableOpacity>
                         </View>
+                        {statusPickerOpen && (
+                            <View style={styles.dropdownMenu}>
+                                {statusOptions.map((option) => {
+                                    const isActive = option.value === statusFilter;
+                                    return (
+                                        <TouchableOpacity
+                                            key={option.value}
+                                            style={[styles.dropdownOption, isActive && styles.dropdownOptionActive]}
+                                            onPress={() => {
+                                                setStatusFilter(option.value);
+                                                setStatusPickerOpen(false);
+                                            }}
+                                        >
+                                            <Text style={[styles.dropdownOptionText, isActive && styles.dropdownOptionTextActive]}>
+                                                {option.label}
+                                            </Text>
+                                        </TouchableOpacity>
+                                    );
+                                })}
+                            </View>
+                        )}
                     </View>
 
                     <View style={styles.tableCard}>
@@ -516,10 +555,10 @@ export default function Stock() {
                                         {[5, 10, 25, 50].map((n) => (
                                             <TouchableOpacity
                                                 key={n}
-                                                style={[styles.perPageOption, n === itemsPerPage && styles.perPageOptionActive]}
+                                                style={[styles.dropdownOption, n === itemsPerPage && styles.dropdownOptionActive]}
                                                 onPress={() => { setItemsPerPage(n); setShowPerPageMenu(false); }}
                                             >
-                                                <Text style={[styles.perPageOptionText, n === itemsPerPage && styles.perPageOptionTextActive]}>{n}</Text>
+                                                <Text style={[styles.dropdownOptionText, n === itemsPerPage && styles.dropdownOptionTextActive]}>{n}</Text>
                                             </TouchableOpacity>
                                         ))}
                                     </View>
@@ -720,28 +759,7 @@ export default function Stock() {
                 </View>
             </Modal>
 
-            <Modal transparent visible={statusPickerOpen} animationType="fade" onRequestClose={() => setStatusPickerOpen(false)}>
-                <View style={styles.modalOverlay}>
-                    <View style={styles.pickerCard}>
-                        <Text style={styles.modalTitle}>Select Status</Text>
-                        {statusOptions.map((option) => (
-                            <TouchableOpacity
-                                key={option.value}
-                                style={styles.pickerOption}
-                                onPress={() => {
-                                    setStatusFilter(option.value);
-                                    setStatusPickerOpen(false);
-                                }}
-                            >
-                                <Text style={styles.pickerText}>{option.label}</Text>
-                            </TouchableOpacity>
-                        ))}
-                        <TouchableOpacity style={styles.secondaryButton} onPress={() => setStatusPickerOpen(false)}>
-                            <Text style={styles.secondaryButtonText}>Close</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </Modal>
+
 
             <FloatingChatButton />
         </SafeAreaView>
@@ -1095,20 +1113,29 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         gap: 12,
     },
-    pickerCard: {
-        width: '100%',
-        maxWidth: 320,
+    dropdownMenu: {
+        marginTop: 12,
         backgroundColor: Colors.landing.white,
-        borderRadius: 10,
-        padding: 20,
-        gap: 10,
+        borderRadius: 8,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        overflow: 'hidden',
     },
-    pickerOption: {
-        paddingVertical: 8,
+    dropdownOption: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
     },
-    pickerText: {
-        fontSize: 14,
-        color: '#111827',
+    dropdownOptionActive: {
+        backgroundColor: Colors.landing.lightPurple,
+    },
+    dropdownOptionText: {
+        fontSize: 13,
+        color: '#374151',
+        fontWeight: '500',
+    },
+    dropdownOptionTextActive: {
+        color: Colors.landing.primaryPurple,
+        fontWeight: '600',
     },
     paginationBar: {
         flexDirection: 'row',
@@ -1188,19 +1215,5 @@ const styles = StyleSheet.create({
         elevation: 4,
         zIndex: 10,
     },
-    perPageOption: {
-        paddingVertical: 8,
-        paddingHorizontal: 16,
-    },
-    perPageOptionActive: {
-        backgroundColor: Colors.landing.lightPurple,
-    },
-    perPageOptionText: {
-        fontSize: 12,
-        color: '#374151',
-    },
-    perPageOptionTextActive: {
-        color: Colors.landing.primaryPurple,
-        fontWeight: '600',
-    },
+
 });

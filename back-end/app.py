@@ -1,12 +1,13 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import logging
 from dotenv import load_dotenv
+from datetime import datetime
 
 load_dotenv()
 
@@ -104,6 +105,20 @@ def get_current_user():
         return User.query.get(int(user_id))
     except (TypeError, ValueError):
         return None
+
+
+def parse_date(value, field_name):
+    if value is None:
+        return None
+    if isinstance(value, str):
+        cleaned = value.strip()
+        if not cleaned:
+            return None
+        try:
+            return datetime.strptime(cleaned, "%Y-%m-%d").date()
+        except ValueError as exc:
+            raise ValueError(f"{field_name} must be YYYY-MM-DD") from exc
+    raise ValueError(f"{field_name} must be a string")
 
 # --- Auth Routes ---
 
@@ -616,6 +631,173 @@ def update_or_delete_dish(dish_id):
     except Exception as e:
         db.session.rollback()
         app.logger.exception("/inventory/dishes update/delete failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/stock/batches", methods=["GET"])
+@jwt_required()
+def list_stock_batches():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        search = request.args.get("search", "").strip()
+        query = Ingredient.query.filter(
+            Ingredient.orgID == user.orgID,
+            or_(Ingredient.expiry.isnot(None), Ingredient.batchNum.isnot(None)),
+        )
+
+        if search:
+            query = query.filter(
+                or_(
+                    Ingredient.ingName.ilike(f"%{search}%"),
+                    Ingredient.batchNum.ilike(f"%{search}%"),
+                )
+            )
+
+        batches = query.order_by(
+            Ingredient.expiry.is_(None),
+            Ingredient.expiry.asc(),
+            Ingredient.ingName.asc(),
+        ).all()
+
+        return jsonify({
+            "batches": [
+                {
+                    "ingID": batch.ingID,
+                    "ingName": batch.ingName,
+                    "category": batch.category,
+                    "expiry": batch.expiry.isoformat() if batch.expiry else None,
+                    "batchNum": batch.batchNum,
+                }
+                for batch in batches
+            ]
+        }), 200
+    except Exception as e:
+        app.logger.exception("/stock/batches GET failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/stock/batches", methods=["POST"])
+@jwt_required()
+def create_stock_batch():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        ing_id = data.get("ingID")
+        if not ing_id:
+            return jsonify({"error": "Missing ingID"}), 400
+
+        master = Ingredient.query.filter(
+            Ingredient.ingID == ing_id,
+            Ingredient.orgID == user.orgID,
+            Ingredient.expiry.is_(None),
+            Ingredient.batchNum.is_(None),
+        ).first()
+
+        if not master:
+            return jsonify({"error": "Ingredient type not found"}), 404
+
+        try:
+            expiry = parse_date(data.get("expiry"), "expiry")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        batch_num = data.get("batchNum")
+        if isinstance(batch_num, str):
+            batch_num = batch_num.strip() or None
+
+        if not expiry and not batch_num:
+            return jsonify({"error": "Batch requires expiry or batchNum"}), 400
+
+        new_batch = Ingredient(
+            ingName=master.ingName,
+            category=master.category,
+            expiry=expiry,
+            batchNum=batch_num,
+            orgID=user.orgID,
+        )
+        db.session.add(new_batch)
+        db.session.commit()
+
+        return jsonify({
+            "msg": "Batch created",
+            "batch": {
+                "ingID": new_batch.ingID,
+                "ingName": new_batch.ingName,
+                "category": new_batch.category,
+                "expiry": new_batch.expiry.isoformat() if new_batch.expiry else None,
+                "batchNum": new_batch.batchNum,
+            },
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("/stock/batches POST failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/stock/batches/<int:ing_id>", methods=["PATCH", "DELETE"])
+@jwt_required()
+def update_or_delete_stock_batch(ing_id):
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        batch = Ingredient.query.filter(
+            Ingredient.ingID == ing_id,
+            Ingredient.orgID == user.orgID,
+            or_(Ingredient.expiry.isnot(None), Ingredient.batchNum.isnot(None)),
+        ).first()
+
+        if not batch:
+            return jsonify({"error": "Batch not found"}), 404
+
+        if request.method == "DELETE":
+            db.session.delete(batch)
+            db.session.commit()
+            return jsonify({"msg": "Batch deleted"}), 200
+
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        if "expiry" in data:
+            try:
+                batch.expiry = parse_date(data.get("expiry"), "expiry")
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+
+        if "batchNum" in data:
+            batch_num = data.get("batchNum")
+            if isinstance(batch_num, str):
+                batch_num = batch_num.strip()
+            batch.batchNum = batch_num or None
+
+        if not batch.expiry and not batch.batchNum:
+            return jsonify({"error": "Batch requires expiry or batchNum"}), 400
+
+        db.session.commit()
+        return jsonify({
+            "msg": "Batch updated",
+            "batch": {
+                "ingID": batch.ingID,
+                "ingName": batch.ingName,
+                "category": batch.category,
+                "expiry": batch.expiry.isoformat() if batch.expiry else None,
+                "batchNum": batch.batchNum,
+            },
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("/stock/batches update/delete failed")
         return jsonify({"error": str(e)}), 500
 
 # --- Gemini Chatbot Route ---

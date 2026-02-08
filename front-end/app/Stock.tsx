@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import {
     Modal,
     SafeAreaView,
@@ -14,29 +14,25 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
 import FloatingChatButton from '@/components/FloatingChatButton';
+import api from '@/services/api';
 
 type Batch = {
     id: number;
     name: string;
-    batchId: string;
-    quantity: number;
-    unit: string;
-    received: string;
-    expires: string;
+    category?: string | null;
+    batchNum?: string | null;
+    expiry?: string | null;
 };
 
 type StatusFilter = 'all' | 'healthy' | 'expiring' | 'expired';
 
-type ModalType = 'add' | 'adjust' | 'waste' | 'delete' | null;
+type ModalType = 'add' | 'edit' | 'delete' | null;
 
-const initialBatches: Batch[] = [
-    { id: 1, name: 'Organic Tomatoes', batchId: 'BTH-001-2024', quantity: 25, unit: 'kg', received: '2024-02-01', expires: '2024-02-10' },
-    { id: 2, name: 'Fresh Mozzarella', batchId: 'BTH-002-2024', quantity: 12, unit: 'kg', received: '2024-02-03', expires: '2024-02-08' },
-    { id: 3, name: 'Basil Leaves', batchId: 'BTH-003-2024', quantity: 3.5, unit: 'kg', received: '2024-02-05', expires: '2024-02-15' },
-    { id: 4, name: 'Olive Oil', batchId: 'BTH-004-2024', quantity: 50, unit: 'L', received: '2024-01-15', expires: '2024-12-31' },
-    { id: 5, name: 'Chicken Breast', batchId: 'BTH-005-2024', quantity: 18, unit: 'kg', received: '2024-02-04', expires: '2024-02-06' },
-    { id: 6, name: 'Fresh Lettuce', batchId: 'BTH-006-2024', quantity: 8, unit: 'kg', received: '2024-02-06', expires: '2024-02-09' },
-];
+type IngredientOption = {
+    ingID: number;
+    ingName: string;
+    category?: string | null;
+};
 
 const statusOptions: { label: string; value: StatusFilter }[] = [
     { label: 'All Status', value: 'all' },
@@ -46,20 +42,30 @@ const statusOptions: { label: string; value: StatusFilter }[] = [
 ];
 
 export default function Stock() {
-    const [batches, setBatches] = useState<Batch[]>(initialBatches);
+    const [batches, setBatches] = useState<Batch[]>([]);
+    const [isLoading, setIsLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [refreshKey, setRefreshKey] = useState(0);
     const [search, setSearch] = useState('');
     const [statusFilter, setStatusFilter] = useState<StatusFilter>('all');
     const [sortField, setSortField] = useState<keyof Batch | null>(null);
     const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
     const [modalType, setModalType] = useState<ModalType>(null);
     const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
-    const [quantityInput, setQuantityInput] = useState('');
-    const [wasteReason, setWasteReason] = useState('');
+    const [batchNumInput, setBatchNumInput] = useState('');
+    const [expiryInput, setExpiryInput] = useState('');
+    const [modalError, setModalError] = useState<string | null>(null);
     const [statusPickerOpen, setStatusPickerOpen] = useState(false);
+    const [availableIngredients, setAvailableIngredients] = useState<IngredientOption[]>([]);
+    const [ingredientSearch, setIngredientSearch] = useState('');
+    const [selectedIngredient, setSelectedIngredient] = useState<IngredientOption | null>(null);
 
     const today = useMemo(() => new Date(), []);
 
-    const getStatus = (expires: string) => {
+    const getStatus = (expires?: string | null) => {
+        if (!expires) {
+            return { label: 'No Expiry', filter: 'healthy', pillStyle: styles.statusHealthy } as const;
+        }
         const expiry = new Date(expires);
         const days = Math.ceil((expiry.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
 
@@ -75,7 +81,7 @@ export default function Stock() {
     const stats = useMemo(() => {
         return batches.reduce(
             (acc, batch) => {
-                const status = getStatus(batch.expires).filter;
+                const status = getStatus(batch.expiry).filter;
                 if (status === 'healthy') acc.healthy += 1;
                 if (status === 'expiring') acc.expiring += 1;
                 if (status === 'expired') acc.expired += 1;
@@ -91,24 +97,19 @@ export default function Stock() {
             const matchesSearch =
                 !lowered ||
                 batch.name.toLowerCase().includes(lowered) ||
-                batch.batchId.toLowerCase().includes(lowered);
-            const status = getStatus(batch.expires).filter;
+                (batch.batchNum || '').toLowerCase().includes(lowered);
+            const status = getStatus(batch.expiry).filter;
             const matchesStatus = statusFilter === 'all' || statusFilter === status;
             return matchesSearch && matchesStatus;
         });
 
         if (sortField) {
             result = [...result].sort((a, b) => {
-                let aVal: string | number = a[sortField];
-                let bVal: string | number = b[sortField];
+                const aVal = (a[sortField] ?? '') as string | number;
+                const bVal = (b[sortField] ?? '') as string | number;
 
-                if (sortField === 'quantity') {
-                    aVal = Number(aVal);
-                    bVal = Number(bVal);
-                }
-
-                if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
-                if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+                if (String(aVal) < String(bVal)) return sortDirection === 'asc' ? -1 : 1;
+                if (String(aVal) > String(bVal)) return sortDirection === 'asc' ? 1 : -1;
                 return 0;
             });
         }
@@ -128,43 +129,115 @@ export default function Stock() {
     const openModal = (type: ModalType, batch?: Batch) => {
         setModalType(type);
         setSelectedBatch(batch ?? null);
-        setQuantityInput(batch ? String(batch.quantity) : '');
-        setWasteReason('');
+        setBatchNumInput(batch?.batchNum ?? '');
+        setExpiryInput(batch?.expiry ?? '');
+        setModalError(null);
+        setSelectedIngredient(null);
+        setIngredientSearch('');
+        if (type === 'add') {
+            loadAvailableIngredients();
+        }
     };
 
     const closeModal = () => {
         setModalType(null);
         setSelectedBatch(null);
-        setQuantityInput('');
-        setWasteReason('');
+        setBatchNumInput('');
+        setExpiryInput('');
+        setModalError(null);
+        setSelectedIngredient(null);
     };
 
-    const handleConfirm = () => {
+    const loadAvailableIngredients = async () => {
+        try {
+            const response = await api.get('/inventory/ingredients');
+            const ingredients = response.data?.ingredients ?? [];
+            setAvailableIngredients(
+                ingredients.map((ing: { ingID: number; ingName?: string; category?: string | null }) => ({
+                    ingID: ing.ingID,
+                    ingName: ing.ingName || '-',
+                    category: ing.category ?? null,
+                }))
+            );
+        } catch (fetchError) {
+            setModalError('Unable to load ingredient types.');
+        }
+    };
+
+    const handleConfirm = async () => {
         if (!modalType) return;
+        setModalError(null);
 
-        if (modalType === 'adjust' && selectedBatch) {
-            const nextQuantity = Number(quantityInput);
-            if (!Number.isNaN(nextQuantity)) {
-                // TODO: replace with backend call to update batch quantity.
-                setBatches((prev) =>
-                    prev.map((batch) => (batch.id === selectedBatch.id ? { ...batch, quantity: nextQuantity } : batch))
-                );
+        try {
+            if (modalType === 'add') {
+                if (!selectedIngredient) {
+                    setModalError('Select an ingredient type first.');
+                    return;
+                }
+                const batchNum = batchNumInput.trim() || undefined;
+                const expiry = expiryInput.trim() || undefined;
+                if (!batchNum && !expiry) {
+                    setModalError('Provide a batch ID or expiry date.');
+                    return;
+                }
+                await api.post('/stock/batches', {
+                    ingID: selectedIngredient.ingID,
+                    batchNum,
+                    expiry,
+                });
             }
-        }
 
-        if ((modalType === 'waste' || modalType === 'delete') && selectedBatch) {
-            // TODO: replace with backend call to remove or update batch.
-            setBatches((prev) => prev.filter((batch) => batch.id !== selectedBatch.id));
-        }
+            if (modalType === 'edit' && selectedBatch) {
+                await api.patch(`/stock/batches/${selectedBatch.id}`, {
+                    batchNum: batchNumInput.trim() || null,
+                    expiry: expiryInput.trim() || null,
+                });
+            }
 
-        if (modalType === 'add') {
-            // TODO: replace with backend call to create a new batch.
-        }
+            if (modalType === 'delete' && selectedBatch) {
+                await api.delete(`/stock/batches/${selectedBatch.id}`);
+            }
 
-        closeModal();
+            setRefreshKey((prev) => prev + 1);
+            closeModal();
+        } catch (saveError) {
+            setModalError('Unable to save changes. Please try again.');
+        }
     };
 
     const statusLabel = statusOptions.find((option) => option.value === statusFilter)?.label ?? 'All Status';
+
+    const filteredIngredients = useMemo(() => {
+        const needle = ingredientSearch.trim().toLowerCase();
+        if (!needle) return availableIngredients;
+        return availableIngredients.filter((ing) => ing.ingName.toLowerCase().includes(needle));
+    }, [availableIngredients, ingredientSearch]);
+
+    useEffect(() => {
+        const fetchBatches = async () => {
+            setIsLoading(true);
+            setError(null);
+            try {
+                const response = await api.get('/stock/batches');
+                const serverBatches = response.data?.batches ?? [];
+                setBatches(
+                    serverBatches.map((batch: { ingID: number; ingName?: string; category?: string; batchNum?: string; expiry?: string }) => ({
+                        id: batch.ingID,
+                        name: batch.ingName || '-',
+                        category: batch.category ?? null,
+                        batchNum: batch.batchNum ?? null,
+                        expiry: batch.expiry ?? null,
+                    }))
+                );
+            } catch (fetchError) {
+                setError('Unable to load stock batches.');
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchBatches();
+    }, [refreshKey]);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -216,7 +289,7 @@ export default function Stock() {
                                 <Text style={styles.selectText}>{statusLabel}</Text>
                                 <Ionicons name="chevron-down" size={16} color="#6b7280" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={styles.primaryButton} onPress={() => toggleSort('expires')}>
+                            <TouchableOpacity style={styles.primaryButton} onPress={() => toggleSort('expiry')}>
                                 <Text style={styles.primaryButtonText}>Sort by Expiry</Text>
                             </TouchableOpacity>
                             <TouchableOpacity
@@ -239,19 +312,14 @@ export default function Stock() {
                                 <Text style={styles.tableHeaderText}>Ingredient</Text>
                                 <Ionicons name="swap-vertical" size={12} color="#6b7280" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.tableCell, styles.cellBatch]} onPress={() => toggleSort('batchId')}>
+                            <View style={[styles.tableCell, styles.cellCategory]}>
+                                <Text style={styles.tableHeaderText}>Category</Text>
+                            </View>
+                            <TouchableOpacity style={[styles.tableCell, styles.cellBatch]} onPress={() => toggleSort('batchNum')}>
                                 <Text style={styles.tableHeaderText}>Batch ID</Text>
                                 <Ionicons name="swap-vertical" size={12} color="#6b7280" />
                             </TouchableOpacity>
-                            <TouchableOpacity style={[styles.tableCell, styles.cellQuantity]} onPress={() => toggleSort('quantity')}>
-                                <Text style={styles.tableHeaderText}>Quantity</Text>
-                                <Ionicons name="swap-vertical" size={12} color="#6b7280" />
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[styles.tableCell, styles.cellDate]} onPress={() => toggleSort('received')}>
-                                <Text style={styles.tableHeaderText}>Received</Text>
-                                <Ionicons name="swap-vertical" size={12} color="#6b7280" />
-                            </TouchableOpacity>
-                            <TouchableOpacity style={[styles.tableCell, styles.cellDate]} onPress={() => toggleSort('expires')}>
+                            <TouchableOpacity style={[styles.tableCell, styles.cellDate]} onPress={() => toggleSort('expiry')}>
                                 <Text style={styles.tableHeaderText}>Expires</Text>
                                 <Ionicons name="swap-vertical" size={12} color="#6b7280" />
                             </TouchableOpacity>
@@ -263,24 +331,42 @@ export default function Stock() {
                             </View>
                         </View>
 
-                        {filtered.map((batch) => {
-                            const status = getStatus(batch.expires);
+                        {isLoading && (
+                            <View style={styles.tableRow}>
+                                <View style={styles.tableCell}>
+                                    <Text style={styles.cellSecondary}>Loading...</Text>
+                                </View>
+                            </View>
+                        )}
+                        {!isLoading && error && (
+                            <View style={styles.tableRow}>
+                                <View style={styles.tableCell}>
+                                    <Text style={styles.cellSecondary}>{error}</Text>
+                                </View>
+                            </View>
+                        )}
+                        {!isLoading && !error && filtered.length === 0 && (
+                            <View style={styles.tableRow}>
+                                <View style={styles.tableCell}>
+                                    <Text style={styles.cellSecondary}>No batches found.</Text>
+                                </View>
+                            </View>
+                        )}
+                        {!isLoading && !error && filtered.map((batch) => {
+                            const status = getStatus(batch.expiry);
                             return (
                                 <View key={batch.id} style={styles.tableRow}>
                                     <View style={[styles.tableCell, styles.cellName]}>
                                         <Text style={styles.cellPrimary}>{batch.name}</Text>
                                     </View>
+                                    <View style={[styles.tableCell, styles.cellCategory]}>
+                                        <Text style={styles.cellSecondary}>{batch.category || '-'}</Text>
+                                    </View>
                                     <View style={[styles.tableCell, styles.cellBatch]}>
-                                        <Text style={styles.cellMono}>{batch.batchId}</Text>
-                                    </View>
-                                    <View style={[styles.tableCell, styles.cellQuantity]}>
-                                        <Text style={styles.cellPrimary}>{batch.quantity} {batch.unit}</Text>
+                                        <Text style={styles.cellMono}>{batch.batchNum || '-'}</Text>
                                     </View>
                                     <View style={[styles.tableCell, styles.cellDate]}>
-                                        <Text style={styles.cellSecondary}>{batch.received}</Text>
-                                    </View>
-                                    <View style={[styles.tableCell, styles.cellDate]}>
-                                        <Text style={styles.cellSecondary}>{batch.expires}</Text>
+                                        <Text style={styles.cellSecondary}>{batch.expiry || '-'}</Text>
                                     </View>
                                     <View style={[styles.tableCell, styles.cellStatus]}>
                                         <View style={[styles.statusPill, status.pillStyle]}>
@@ -289,14 +375,11 @@ export default function Stock() {
                                     </View>
                                     <View style={[styles.tableCell, styles.cellActions]}>
                                         <View style={styles.actionRow}>
-                                            <TouchableOpacity onPress={() => openModal('adjust', batch)} style={styles.iconButton}>
+                                            <TouchableOpacity onPress={() => openModal('edit', batch)} style={styles.iconButton}>
                                                 <Ionicons name="pencil" size={16} color="#2563eb" />
                                             </TouchableOpacity>
-                                            <TouchableOpacity onPress={() => openModal('waste', batch)} style={styles.iconButton}>
-                                                <Ionicons name="alert-circle" size={16} color="#ea580c" />
-                                            </TouchableOpacity>
                                             <TouchableOpacity onPress={() => openModal('delete', batch)} style={styles.iconButton}>
-                                                <Ionicons name="close" size={16} color="#dc2626" />
+                                                <Ionicons name="trash" size={16} color="#dc2626" />
                                             </TouchableOpacity>
                                         </View>
                                     </View>
@@ -311,34 +394,27 @@ export default function Stock() {
                 <View style={styles.modalOverlay}>
                     <View style={styles.modalCard}>
                         <Text style={styles.modalTitle}>
-                            {modalType === 'adjust' && 'Adjust Quantity'}
-                            {modalType === 'waste' && 'Mark as Waste'}
+                            {modalType === 'edit' && 'Edit Batch'}
                             {modalType === 'delete' && 'Delete Batch'}
                             {modalType === 'add' && 'Add Batch'}
                         </Text>
-                        {modalType === 'adjust' && selectedBatch && (
+                        {modalType === 'edit' && selectedBatch && (
                             <View style={styles.modalBody}>
                                 <Text style={styles.modalLabel}>Batch</Text>
-                                <Text style={styles.modalValue}>{selectedBatch.batchId} - {selectedBatch.name}</Text>
-                                <Text style={styles.modalLabel}>New Quantity ({selectedBatch.unit})</Text>
+                                <Text style={styles.modalValue}>{selectedBatch.name}</Text>
+                                <Text style={styles.modalLabel}>Batch ID (optional)</Text>
                                 <TextInput
                                     style={styles.modalInput}
-                                    keyboardType="numeric"
-                                    value={quantityInput}
-                                    onChangeText={setQuantityInput}
+                                    placeholder="e.g. BTH-001-2024"
+                                    value={batchNumInput}
+                                    onChangeText={setBatchNumInput}
                                 />
-                            </View>
-                        )}
-                        {modalType === 'waste' && selectedBatch && (
-                            <View style={styles.modalBody}>
-                                <Text style={styles.modalLabel}>Batch</Text>
-                                <Text style={styles.modalValue}>{selectedBatch.batchId} - {selectedBatch.name}</Text>
-                                <Text style={styles.modalLabel}>Reason</Text>
+                                <Text style={styles.modalLabel}>Expiry date (YYYY-MM-DD)</Text>
                                 <TextInput
                                     style={styles.modalInput}
-                                    placeholder="Expired, spoiled, damaged..."
-                                    value={wasteReason}
-                                    onChangeText={setWasteReason}
+                                    placeholder="2024-02-10"
+                                    value={expiryInput}
+                                    onChangeText={setExpiryInput}
                                 />
                             </View>
                         )}
@@ -346,16 +422,53 @@ export default function Stock() {
                             <View style={styles.modalBody}>
                                 <Text style={styles.modalValue}>Are you sure you want to delete this batch? This action cannot be undone.</Text>
                                 <View style={styles.modalInfoBox}>
-                                    <Text style={styles.modalInfoText}>{selectedBatch.batchId}</Text>
-                                    <Text style={styles.modalInfoText}>{selectedBatch.name} - {selectedBatch.quantity} {selectedBatch.unit}</Text>
+                                    <Text style={styles.modalInfoText}>{selectedBatch.name}</Text>
+                                    <Text style={styles.modalInfoText}>{selectedBatch.batchNum || 'No batch ID'}</Text>
                                 </View>
                             </View>
                         )}
                         {modalType === 'add' && (
                             <View style={styles.modalBody}>
-                                <Text style={styles.modalValue}>Batch creation will be wired to the backend soon.</Text>
+                                <Text style={styles.modalLabel}>Ingredient type</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="Search ingredient types..."
+                                    value={ingredientSearch}
+                                    onChangeText={setIngredientSearch}
+                                />
+                                <View style={styles.ingredientList}>
+                                    {filteredIngredients.map((ingredient) => (
+                                        <TouchableOpacity
+                                            key={ingredient.ingID}
+                                            style={styles.ingredientRow}
+                                            onPress={() => setSelectedIngredient(ingredient)}
+                                        >
+                                            <Text style={styles.ingredientName}>{ingredient.ingName}</Text>
+                                            <Text style={styles.ingredientCategory}>{ingredient.category || 'Uncategorized'}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                                {selectedIngredient && (
+                                    <Text style={styles.modalValue}>Selected: {selectedIngredient.ingName}</Text>
+                                )}
+                                <Text style={styles.modalLabel}>Batch ID (optional)</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="e.g. BTH-001-2024"
+                                    value={batchNumInput}
+                                    onChangeText={setBatchNumInput}
+                                />
+                                <Text style={styles.modalLabel}>Expiry date (YYYY-MM-DD)</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="2024-02-10"
+                                    value={expiryInput}
+                                    onChangeText={setExpiryInput}
+                                />
                             </View>
                         )}
+
+                        {modalError && <Text style={styles.modalError}>{modalError}</Text>}
 
                         <View style={styles.modalActions}>
                             <TouchableOpacity style={styles.primaryButton} onPress={handleConfirm}>
@@ -570,12 +683,11 @@ const styles = StyleSheet.create({
     cellName: {
         flex: 2.2,
     },
+    cellCategory: {
+        flex: 1.4,
+    },
     cellBatch: {
         flex: 1.6,
-    },
-    cellQuantity: {
-        flex: 1.2,
-        justifyContent: 'flex-end',
     },
     cellDate: {
         flex: 1.4,
@@ -673,6 +785,35 @@ const styles = StyleSheet.create({
         paddingHorizontal: 12,
         paddingVertical: 8,
         fontSize: 13,
+    },
+    modalError: {
+        fontSize: 12,
+        color: '#b91c1c',
+        fontWeight: '600',
+        marginBottom: 8,
+    },
+    ingredientList: {
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 10,
+        maxHeight: 200,
+        overflow: 'hidden',
+    },
+    ingredientRow: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderBottomWidth: 1,
+        borderBottomColor: '#f1f5f9',
+    },
+    ingredientName: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: Colors.landing.primaryPurple,
+    },
+    ingredientCategory: {
+        fontSize: 11,
+        color: '#6b7280',
+        marginTop: 2,
     },
     modalInfoBox: {
         backgroundColor: '#f9fafb',

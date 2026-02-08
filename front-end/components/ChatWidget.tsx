@@ -380,27 +380,17 @@ const styles = StyleSheet.create({
         height: '70%',
         maxHeight: 600,
         backgroundColor: '#fff',
-        borderTopLeftRadius: 24,
-        borderTopRightRadius: 24,
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: -4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 12,
-        elevation: 20,
+        borderTopLeftRadius: 16,
+        borderTopRightRadius: 16,
         overflow: 'hidden',
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
     },
     containerWeb: {
         width: 400,
         height: 560,
         maxHeight: 560,
-        borderRadius: 16,
-        shadowOffset: { width: 0, height: 8 },
-        shadowOpacity: 0.25,
-        shadowRadius: 32,
-        // Web-specific shadow
-        ...(Platform.OS === 'web' && {
-            boxShadow: '0 16px 64px rgba(0, 0, 0, 0.3)',
-        } as any),
+        borderRadius: 12,
     },
     header: {
         flexDirection: 'row',
@@ -448,7 +438,7 @@ const styles = StyleSheet.create({
     messageBubble: {
         maxWidth: '85%',
         padding: 12,
-        borderRadius: 16,
+        borderRadius: 12,
         marginBottom: 8,
     },
     userBubble: {

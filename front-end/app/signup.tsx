@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-    Dimensions,
     Platform,
     SafeAreaView,
     ScrollView,
@@ -15,8 +14,6 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import api from '@/services/api';
-
-const { width } = Dimensions.get('window');
 
 export default function SignupScreen() {
     const [email, setEmail] = useState('');
@@ -90,20 +87,14 @@ export default function SignupScreen() {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
-            <View style={styles.backgroundBase}>
-                <View style={styles.orbTop} />
-                <View style={styles.orbBottom} />
-                <View style={styles.gridOverlay} />
-            </View>
 
             <View style={styles.nav}>
                 <View style={styles.navContainer}>
                     <TouchableOpacity onPress={navigateToHome} style={styles.logoWrap}>
-                        <View style={styles.logoMark} />
                         <Text style={styles.logo}>StockSense</Text>
                     </TouchableOpacity>
                     <TouchableOpacity onPress={navigateToHome} style={styles.backLink}>
-                        <Ionicons name="arrow-back" size={16} color={Colors.landing.white} />
+                        <Ionicons name="arrow-back" size={16} color={Colors.landing.primaryPurple} />
                         <Text style={styles.backLinkText}>Back</Text>
                     </TouchableOpacity>
                 </View>
@@ -283,49 +274,12 @@ const styles = StyleSheet.create({
         flex: 1,
         backgroundColor: Colors.landing.lightPurple,
     },
-    backgroundBase: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: Colors.landing.lightPurple,
-    },
-    orbTop: {
-        position: 'absolute',
-        top: -width * 0.45,
-        right: -width * 0.2,
-        width: width * 1.0,
-        height: width * 1.0,
-        borderRadius: width * 0.5,
-        backgroundColor: Colors.landing.primaryPurple,
-        opacity: 0.9,
-    },
-    orbBottom: {
-        position: 'absolute',
-        bottom: -width * 0.3,
-        left: -width * 0.2,
-        width: width * 0.7,
-        height: width * 0.7,
-        borderRadius: width * 0.35,
-        backgroundColor: Colors.landing.accentPurple,
-        opacity: 0.2,
-    },
-    gridOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: 'transparent',
-        opacity: 0.06,
-        borderTopWidth: 1,
-        borderLeftWidth: 1,
-        borderColor: Colors.landing.primaryPurple,
-        transform: [{ rotate: '1deg' }],
-    },
     nav: {
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        height: Platform.OS === 'ios' ? 90 : 70,
+        borderBottomWidth: 1,
+        borderBottomColor: '#e5e7eb',
+        backgroundColor: Colors.landing.white,
         paddingTop: Platform.OS === 'ios' ? 40 : 20,
-        zIndex: 100,
-        backgroundColor: 'transparent',
-        justifyContent: 'center',
+        paddingBottom: 12,
     },
     navContainer: {
         flexDirection: 'row',
@@ -341,16 +295,10 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 8,
     },
-    logoMark: {
-        width: 14,
-        height: 14,
-        borderRadius: 4,
-        backgroundColor: Colors.landing.white,
-    },
     logo: {
         fontSize: 22,
         fontWeight: '700',
-        color: Colors.landing.white,
+        color: Colors.landing.primaryPurple,
     },
     backLink: {
         flexDirection: 'row',
@@ -358,65 +306,58 @@ const styles = StyleSheet.create({
         gap: 6,
     },
     backLinkText: {
-        color: Colors.landing.white,
+        color: Colors.landing.primaryPurple,
         fontWeight: '600',
         fontSize: 14,
     },
     scrollContent: {
         flexGrow: 1,
-        paddingTop: Platform.OS === 'ios' ? 100 : 80,
+        paddingTop: 40,
         paddingBottom: 40,
     },
     mainContent: {
         alignItems: 'center',
         justifyContent: 'center',
         paddingHorizontal: 20,
-        minHeight: 700,
     },
     card: {
         width: '100%',
-        maxWidth: 620,
+        maxWidth: 580,
         backgroundColor: Colors.landing.white,
-        borderRadius: 20,
+        borderRadius: 12,
         padding: 28,
-        shadowColor: '#111111',
-        shadowOffset: { width: 0, height: 20 },
-        shadowOpacity: 0.2,
-        shadowRadius: 30,
-        elevation: 12,
         borderWidth: 1,
-        borderColor: 'rgba(52, 23, 85, 0.08)',
+        borderColor: '#e5e7eb',
     },
-        cardDisabled: {
-            opacity: 0.6,
-        },
+    cardDisabled: {
+        opacity: 0.6,
+    },
     cardHeader: {
         marginBottom: 24,
     },
     kicker: {
         textTransform: 'uppercase',
-        letterSpacing: 2,
-        fontSize: 12,
-        fontWeight: '700',
+        letterSpacing: 1.5,
+        fontSize: 11,
+        fontWeight: '600',
         color: Colors.landing.accentPurple,
         marginBottom: 10,
     },
     title: {
-        fontSize: 28,
+        fontSize: 26,
         fontWeight: '700',
         color: Colors.landing.black,
-        marginBottom: 8,
+        marginBottom: 6,
     },
     subtitle: {
-        fontSize: 15,
-        color: '#4a4a4a',
+        fontSize: 14,
+        color: '#6b7280',
     },
-    section: {
     notice: {
         paddingVertical: 10,
         paddingHorizontal: 12,
-        borderRadius: 10,
-        marginTop: 16,
+        borderRadius: 8,
+        marginBottom: 16,
         borderWidth: 1,
     },
     noticeSuccess: {
@@ -432,16 +373,17 @@ const styles = StyleSheet.create({
         color: '#374151',
         fontWeight: '600',
     },
+    section: {
         marginBottom: 20,
         padding: 16,
-        borderRadius: 16,
-        backgroundColor: 'rgba(234, 234, 244, 0.5)',
+        borderRadius: 10,
+        backgroundColor: Colors.landing.lightPurple,
         borderWidth: 1,
-        borderColor: 'rgba(52, 23, 85, 0.08)',
+        borderColor: '#e5e7eb',
     },
     sectionTitle: {
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 15,
+        fontWeight: '600',
         color: Colors.landing.black,
         marginBottom: 14,
     },
@@ -457,19 +399,19 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     label: {
-        marginBottom: 8,
+        marginBottom: 6,
         color: Colors.landing.black,
         fontWeight: '600',
-        fontSize: 14,
+        fontSize: 13,
     },
     input: {
         width: '100%',
-        paddingVertical: 12,
+        paddingVertical: 10,
         paddingHorizontal: 14,
         borderWidth: 1,
-        borderColor: 'rgba(52, 23, 85, 0.15)',
-        borderRadius: 12,
-        fontSize: 16,
+        borderColor: '#d1d5db',
+        borderRadius: 8,
+        fontSize: 15,
         backgroundColor: Colors.landing.white,
     },
     termsAgreement: {
@@ -481,9 +423,9 @@ const styles = StyleSheet.create({
     checkbox: {
         width: 18,
         height: 18,
-        borderWidth: 2,
-        borderColor: 'rgba(52, 23, 85, 0.3)',
-        borderRadius: 5,
+        borderWidth: 1.5,
+        borderColor: '#d1d5db',
+        borderRadius: 4,
         alignItems: 'center',
         justifyContent: 'center',
         backgroundColor: Colors.landing.white,
@@ -496,23 +438,23 @@ const styles = StyleSheet.create({
     termsText: {
         flex: 1,
         fontSize: 13,
-        color: '#4a4a4a',
+        color: '#6b7280',
     },
     linkText: {
         color: Colors.landing.primaryPurple,
-        fontWeight: '700',
+        fontWeight: '600',
     },
     btnPrimary: {
         width: '100%',
-        paddingVertical: 14,
+        paddingVertical: 12,
         backgroundColor: Colors.landing.primaryPurple,
-        borderRadius: 12,
+        borderRadius: 8,
         alignItems: 'center',
     },
     btnPrimaryText: {
         color: Colors.landing.white,
-        fontSize: 16,
-        fontWeight: '700',
+        fontSize: 15,
+        fontWeight: '600',
     },
     inlineFooter: {
         flexDirection: 'row',
@@ -521,12 +463,12 @@ const styles = StyleSheet.create({
         marginTop: 18,
     },
     inlineText: {
-        color: '#4a4a4a',
-        fontSize: 14,
+        color: '#6b7280',
+        fontSize: 13,
     },
     inlineLink: {
         color: Colors.landing.primaryPurple,
-        fontWeight: '700',
-        fontSize: 14,
+        fontWeight: '600',
+        fontSize: 13,
     },
 });

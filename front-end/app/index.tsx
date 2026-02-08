@@ -1,21 +1,14 @@
-import { StyleSheet, View, Text, TouchableOpacity, Dimensions, ScrollView, Platform } from 'react-native';
+import { StyleSheet, View, Text, TouchableOpacity, ScrollView, Platform } from 'react-native';
 import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
 import FloatingChatButton from '@/components/FloatingChatButton';
 
-const { width } = Dimensions.get('window');
-
 // Mobile UI Component (iOS)
 function MobileUI() {
     return (
         <SafeAreaView style={styles.container}>
-            <View style={styles.backgroundBase} />
-            <View style={styles.orbTop} />
-            <View style={styles.orbBottom} />
-            <View style={styles.gridOverlay} />
-
             <ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
                 <View style={styles.header}>
                     <Text style={styles.logo}>StockSense</Text>
@@ -85,13 +78,21 @@ function WebUI() {
     return (
         <SafeAreaView style={styles.webContainer}>
             <ScrollView contentContainerStyle={styles.webScrollContent} showsVerticalScrollIndicator={false}>
-                {/* Simple Header */}
+                {/* Header */}
                 <View style={styles.webHeader}>
-                    <Text style={styles.webLogo}>StockSense</Text>
+                    <View style={styles.webLogoRow}>
+                        <View style={styles.webLogoMark} />
+                        <Text style={styles.webLogo}>StockSense</Text>
+                    </View>
                     <View style={styles.webNav}>
                         <Link href="/login" asChild>
                             <TouchableOpacity style={styles.webLoginButton}>
-                                <Text style={styles.webLoginText}>Login</Text>
+                                <Text style={styles.webLoginText}>Sign In</Text>
+                            </TouchableOpacity>
+                        </Link>
+                        <Link href="/signup" asChild>
+                            <TouchableOpacity style={styles.webSignupButton}>
+                                <Text style={styles.webSignupText}>Get Started</Text>
                             </TouchableOpacity>
                         </Link>
                     </View>
@@ -100,7 +101,8 @@ function WebUI() {
                 {/* Hero Section */}
                 <View style={styles.webHero}>
                     <View style={styles.webBadge}>
-                        <Text style={styles.webBadgeText}>✨ AI-POWERED INTELLIGENCE</Text>
+                        <Ionicons name="sparkles" size={14} color={Colors.landing.accentPurple} />
+                        <Text style={styles.webBadgeText}>AI-POWERED INTELLIGENCE</Text>
                     </View>
 
                     <Text style={styles.webHeroTitle}>
@@ -122,19 +124,25 @@ function WebUI() {
                     {/* Features Grid */}
                     <View style={styles.webFeaturesGrid}>
                         <View style={styles.webFeatureCard}>
-                            <Ionicons name="analytics" size={32} color={Colors.landing.primaryPurple} />
+                            <View style={styles.webFeatureIconCircle}>
+                                <Ionicons name="analytics" size={24} color={Colors.landing.primaryPurple} />
+                            </View>
                             <Text style={styles.webFeatureTitle}>Smart Analytics</Text>
-                            <Text style={styles.webFeatureText}>Real-time insights powered by AI</Text>
+                            <Text style={styles.webFeatureText}>Real-time insights powered by machine learning to optimize every decision across your supply chain.</Text>
                         </View>
                         <View style={styles.webFeatureCard}>
-                            <Ionicons name="trending-up" size={32} color={Colors.landing.primaryPurple} />
+                            <View style={styles.webFeatureIconCircle}>
+                                <Ionicons name="trending-up" size={24} color={Colors.landing.primaryPurple} />
+                            </View>
                             <Text style={styles.webFeatureTitle}>Predictive Alerts</Text>
-                            <Text style={styles.webFeatureText}>Prevent stockouts before they happen</Text>
+                            <Text style={styles.webFeatureText}>Anticipate stockouts and demand shifts before they impact your bottom line.</Text>
                         </View>
                         <View style={styles.webFeatureCard}>
-                            <Ionicons name="leaf" size={32} color={Colors.landing.primaryPurple} />
+                            <View style={styles.webFeatureIconCircle}>
+                                <Ionicons name="leaf" size={24} color={Colors.landing.primaryPurple} />
+                            </View>
                             <Text style={styles.webFeatureTitle}>Waste Reduction</Text>
-                            <Text style={styles.webFeatureText}>Minimize loss, maximize profit</Text>
+                            <Text style={styles.webFeatureText}>Intelligent expiry tracking and batch management to minimize loss and maximize margins.</Text>
                         </View>
                     </View>
                 </View>
@@ -166,41 +174,7 @@ export default function LandingPage() {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: Colors.landing.lightPurple,
-    },
-    backgroundBase: {
-        ...StyleSheet.absoluteFillObject,
-        backgroundColor: Colors.landing.lightPurple,
-        zIndex: -1,
-    },
-    orbTop: {
-        position: 'absolute',
-        top: -width * 0.5,
-        right: -width * 0.2,
-        width: width * 1.2,
-        height: width * 1.2,
-        borderRadius: width * 0.6,
-        backgroundColor: Colors.landing.primaryPurple,
-        opacity: 0.08,
-        zIndex: -1,
-    },
-    orbBottom: {
-        position: 'absolute',
-        bottom: -width * 0.4,
-        left: -width * 0.2,
-        width: width,
-        height: width,
-        borderRadius: width * 0.5,
-        backgroundColor: Colors.landing.accentPurple,
-        opacity: 0.05,
-        zIndex: -1,
-    },
-    gridOverlay: {
-        ...StyleSheet.absoluteFillObject,
-        opacity: 0.02,
-        zIndex: -1,
-        borderWidth: 1, // Placeholder for grid texture if we had one
-        borderColor: Colors.landing.primaryPurple,
+        backgroundColor: '#ffffff',
     },
     scrollContent: {
         paddingHorizontal: 24,
@@ -217,7 +191,7 @@ const styles = StyleSheet.create({
         fontSize: 24,
         fontWeight: 'bold',
         color: Colors.landing.primaryPurple,
-        fontFamily: Platform.OS === 'ios' ? 'System' : 'sans-serif',
+        fontFamily: 'SpaceGrotesk_700Bold',
     },
     loginLink: {
         fontSize: 16,
@@ -229,12 +203,10 @@ const styles = StyleSheet.create({
         marginBottom: 40,
     },
     badgeContainer: {
-        backgroundColor: '#fff',
+        backgroundColor: Colors.landing.lightPurple,
         paddingHorizontal: 12,
         paddingVertical: 6,
-        borderRadius: 20,
-        borderWidth: 1,
-        borderColor: 'rgba(52, 23, 85, 0.1)',
+        borderRadius: 6,
         marginBottom: 20,
     },
     badgeText: {
@@ -251,6 +223,7 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 48,
         marginBottom: 16,
+        fontFamily: 'SpaceGrotesk_700Bold',
     },
     heroTitleGradient: {
         color: Colors.landing.primaryPurple,
@@ -273,12 +246,7 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 16,
-        borderRadius: 30,
-        shadowColor: Colors.landing.primaryPurple,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 8,
-        elevation: 8,
+        borderRadius: 8,
     },
     primaryButtonText: {
         color: '#fff',
@@ -291,14 +259,9 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         justifyContent: 'center',
         paddingVertical: 16,
-        borderRadius: 30,
+        borderRadius: 8,
         borderWidth: 1,
-        borderColor: 'rgba(52, 23, 85, 0.1)',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 4,
-        elevation: 2,
+        borderColor: '#e5e7eb',
     },
     secondaryButtonText: {
         color: Colors.landing.primaryPurple,
@@ -312,15 +275,10 @@ const styles = StyleSheet.create({
     previewCard: {
         width: '100%',
         backgroundColor: '#fff',
-        borderRadius: 24,
+        borderRadius: 12,
         padding: 24,
         borderWidth: 1,
-        borderColor: 'rgba(52, 23, 85, 0.1)',
-        shadowColor: '#341755',
-        shadowOffset: { width: 0, height: 20 },
-        shadowOpacity: 0.1,
-        shadowRadius: 30,
-        elevation: 10,
+        borderColor: '#e5e7eb',
     },
     previewHeader: {
         flexDirection: 'row',
@@ -342,6 +300,7 @@ const styles = StyleSheet.create({
         fontWeight: '700',
         color: Colors.landing.black,
         marginBottom: 4,
+        fontFamily: 'SpaceGrotesk_700Bold',
     },
     previewSubtitle: {
         fontSize: 14,
@@ -379,29 +338,52 @@ const styles = StyleSheet.create({
         justifyContent: 'space-between',
         alignItems: 'center',
         paddingHorizontal: 80,
-        paddingVertical: 24,
+        paddingVertical: 18,
         backgroundColor: '#ffffff',
         borderBottomWidth: 1,
-        borderBottomColor: '#f0f0f0',
+        borderBottomColor: '#e5e7eb',
+    },
+    webLogoRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 10,
+    },
+    webLogoMark: {
+        width: 10,
+        height: 28,
+        borderRadius: 3,
+        backgroundColor: Colors.landing.primaryPurple,
     },
     webLogo: {
-        fontSize: 28,
-        fontWeight: 'bold',
+        fontSize: 24,
+        fontWeight: '800',
         color: Colors.landing.primaryPurple,
+        letterSpacing: -0.5,
+        fontFamily: 'SpaceGrotesk_700Bold',
     },
     webNav: {
         flexDirection: 'row',
-        gap: 24,
+        alignItems: 'center',
+        gap: 12,
     },
     webLoginButton: {
-        paddingHorizontal: 24,
+        paddingHorizontal: 20,
         paddingVertical: 10,
-        borderRadius: 8,
-        borderWidth: 1,
-        borderColor: Colors.landing.primaryPurple,
+        borderRadius: 6,
     },
     webLoginText: {
         color: Colors.landing.primaryPurple,
+        fontSize: 15,
+        fontWeight: '600',
+    },
+    webSignupButton: {
+        paddingHorizontal: 20,
+        paddingVertical: 10,
+        borderRadius: 6,
+        backgroundColor: Colors.landing.primaryPurple,
+    },
+    webSignupText: {
+        color: '#ffffff',
         fontSize: 15,
         fontWeight: '600',
     },
@@ -414,10 +396,15 @@ const styles = StyleSheet.create({
         width: '100%',
     },
     webBadge: {
-        paddingHorizontal: 16,
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 8,
+        paddingHorizontal: 18,
         paddingVertical: 8,
-        borderRadius: 20,
+        borderRadius: 6,
         backgroundColor: Colors.landing.lightPurple,
+        borderWidth: 1,
+        borderColor: 'rgba(107, 63, 160, 0.15)',
         marginBottom: 32,
     },
     webBadgeText: {
@@ -427,23 +414,25 @@ const styles = StyleSheet.create({
         letterSpacing: 1.5,
     },
     webHeroTitle: {
-        fontSize: 64,
+        fontSize: 56,
         fontWeight: '800',
         color: Colors.landing.black,
         textAlign: 'center',
         marginBottom: 24,
-        lineHeight: 72,
+        lineHeight: 66,
+        letterSpacing: -1,
+        fontFamily: 'SpaceGrotesk_700Bold',
     },
     webHeroTitleAccent: {
         color: Colors.landing.primaryPurple,
     },
     webHeroDescription: {
-        fontSize: 20,
-        color: '#666',
+        fontSize: 18,
+        color: '#555',
         textAlign: 'center',
-        lineHeight: 32,
+        lineHeight: 30,
         marginBottom: 48,
-        maxWidth: 700,
+        maxWidth: 620,
     },
     webCTA: {
         backgroundColor: Colors.landing.primaryPurple,
@@ -452,22 +441,17 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         paddingHorizontal: 36,
         paddingVertical: 18,
-        borderRadius: 12,
-        shadowColor: Colors.landing.primaryPurple,
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.3,
-        shadowRadius: 12,
-        elevation: 8,
+        borderRadius: 8,
         marginBottom: 80,
         ...(Platform.OS === 'web' && {
             cursor: 'pointer',
-            transition: 'all 0.2s ease',
         } as any),
     },
     webCTAText: {
         color: '#fff',
         fontSize: 18,
         fontWeight: '700',
+        fontFamily: 'SpaceGrotesk_600SemiBold',
     },
     webFeaturesGrid: {
         flexDirection: 'row',
@@ -480,37 +464,44 @@ const styles = StyleSheet.create({
     webFeatureCard: {
         flex: 1,
         minWidth: 280,
-        maxWidth: 320,
+        maxWidth: 340,
         backgroundColor: '#ffffff',
         padding: 32,
-        borderRadius: 16,
+        borderRadius: 10,
         borderWidth: 1,
-        borderColor: '#f0f0f0',
+        borderColor: '#e5e7eb',
+        borderTopWidth: 3,
+        borderTopColor: Colors.landing.primaryPurple,
+        alignItems: 'flex-start',
+    },
+    webFeatureIconCircle: {
+        width: 48,
+        height: 48,
+        borderRadius: 10,
+        backgroundColor: Colors.landing.lightPurple,
         alignItems: 'center',
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.05,
-        shadowRadius: 12,
-        elevation: 2,
+        justifyContent: 'center',
+        marginBottom: 4,
     },
     webFeatureTitle: {
-        fontSize: 20,
+        fontSize: 18,
         fontWeight: '700',
         color: Colors.landing.black,
         marginTop: 16,
         marginBottom: 8,
+        fontFamily: 'SpaceGrotesk_700Bold',
     },
     webFeatureText: {
-        fontSize: 15,
+        fontSize: 14,
         color: '#666',
-        textAlign: 'center',
+        textAlign: 'left',
         lineHeight: 22,
     },
     webFooter: {
         alignItems: 'center',
         paddingVertical: 40,
         borderTopWidth: 1,
-        borderTopColor: '#f0f0f0',
+        borderTopColor: '#e5e7eb',
         marginTop: 40,
     },
     webFooterText: {

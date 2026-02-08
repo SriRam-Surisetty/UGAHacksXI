@@ -279,15 +279,10 @@ const styles = StyleSheet.create({
     },
     card: {
         backgroundColor: Colors.landing.white,
-        borderRadius: 16,
+        borderRadius: 10,
         padding: 20,
         borderWidth: 1,
-        borderColor: 'rgba(52, 23, 85, 0.12)',
-        shadowColor: '#111111',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.08,
-        shadowRadius: 20,
-        elevation: 3,
+        borderColor: '#e5e7eb',
     },
     cardHeaderRow: {
         flexDirection: 'row',
@@ -312,8 +307,8 @@ const styles = StyleSheet.create({
     },
     input: {
         borderWidth: 1,
-        borderColor: 'rgba(52, 23, 85, 0.15)',
-        borderRadius: 12,
+        borderColor: '#d1d5db',
+        borderRadius: 8,
         paddingHorizontal: 14,
         paddingVertical: 10,
         fontSize: 15,
@@ -326,9 +321,9 @@ const styles = StyleSheet.create({
     roleOption: {
         flex: 1,
         paddingVertical: 10,
-        borderRadius: 10,
+        borderRadius: 8,
         borderWidth: 1,
-        borderColor: 'rgba(52, 23, 85, 0.2)',
+        borderColor: '#d1d5db',
         alignItems: 'center',
     },
     roleOptionActive: {
@@ -351,7 +346,7 @@ const styles = StyleSheet.create({
     btnPrimary: {
         backgroundColor: Colors.landing.primaryPurple,
         paddingVertical: 12,
-        borderRadius: 12,
+        borderRadius: 8,
         alignItems: 'center',
     },
     btnPrimaryText: {
@@ -387,7 +382,7 @@ const styles = StyleSheet.create({
     notice: {
         paddingVertical: 10,
         paddingHorizontal: 12,
-        borderRadius: 10,
+        borderRadius: 8,
         borderWidth: 1,
     },
     noticeSuccess: {

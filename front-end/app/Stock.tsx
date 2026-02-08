@@ -702,7 +702,7 @@ const styles = StyleSheet.create({
         paddingHorizontal: 16,
         paddingVertical: 10,
         backgroundColor: Colors.landing.primaryPurple,
-        borderRadius: 8,
+        borderRadius: 6,
     },
     primaryButtonText: {
         color: Colors.landing.white,
@@ -712,7 +712,7 @@ const styles = StyleSheet.create({
     secondaryButton: {
         paddingHorizontal: 16,
         paddingVertical: 10,
-        borderRadius: 8,
+        borderRadius: 6,
         borderWidth: 1,
         borderColor: '#d1d5db',
         backgroundColor: Colors.landing.white,
@@ -734,7 +734,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.landing.white,
         borderWidth: 1,
         borderColor: '#e5e7eb',
-        borderRadius: 12,
+        borderRadius: 8,
         padding: 16,
     },
     statCardHighlight: {
@@ -763,7 +763,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.landing.lightPurple,
         borderWidth: 1,
         borderColor: '#e5e7eb',
-        borderRadius: 12,
+        borderRadius: 8,
         padding: 16,
         marginBottom: 16,
     },
@@ -783,7 +783,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderWidth: 1,
         borderColor: '#d1d5db',
-        borderRadius: 8,
+        borderRadius: 6,
         fontSize: 13,
         backgroundColor: Colors.landing.white,
     },
@@ -795,7 +795,7 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderWidth: 1,
         borderColor: '#d1d5db',
-        borderRadius: 8,
+        borderRadius: 6,
         backgroundColor: Colors.landing.white,
         minWidth: 140,
         justifyContent: 'space-between',
@@ -808,7 +808,7 @@ const styles = StyleSheet.create({
     tableCard: {
         borderWidth: 1,
         borderColor: '#e5e7eb',
-        borderRadius: 12,
+        borderRadius: 8,
         overflow: 'hidden',
         backgroundColor: Colors.landing.white,
     },
@@ -902,8 +902,8 @@ const styles = StyleSheet.create({
     },
     iconButton: {
         padding: 6,
-        borderRadius: 8,
-        backgroundColor: '#f9fafb',
+        borderRadius: 6,
+        backgroundColor: '#f3f4f6',
     },
     modalOverlay: {
         flex: 1,
@@ -916,7 +916,7 @@ const styles = StyleSheet.create({
         width: '100%',
         maxWidth: 420,
         backgroundColor: Colors.landing.white,
-        borderRadius: 12,
+        borderRadius: 10,
         padding: 20,
     },
     modalTitle: {
@@ -941,7 +941,7 @@ const styles = StyleSheet.create({
     modalInput: {
         borderWidth: 1,
         borderColor: '#d1d5db',
-        borderRadius: 8,
+        borderRadius: 6,
         paddingHorizontal: 12,
         paddingVertical: 8,
         fontSize: 13,
@@ -955,7 +955,7 @@ const styles = StyleSheet.create({
     ingredientList: {
         borderWidth: 1,
         borderColor: '#e5e7eb',
-        borderRadius: 10,
+        borderRadius: 8,
         maxHeight: 200,
         overflow: 'hidden',
     },
@@ -976,8 +976,8 @@ const styles = StyleSheet.create({
         marginTop: 2,
     },
     modalInfoBox: {
-        backgroundColor: '#f9fafb',
-        borderRadius: 8,
+        backgroundColor: '#f3f4f6',
+        borderRadius: 6,
         padding: 12,
     },
     modalInfoText: {
@@ -992,7 +992,7 @@ const styles = StyleSheet.create({
         width: '100%',
         maxWidth: 320,
         backgroundColor: Colors.landing.white,
-        borderRadius: 12,
+        borderRadius: 10,
         padding: 20,
         gap: 10,
     },

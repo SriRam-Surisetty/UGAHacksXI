@@ -224,7 +224,7 @@ const fontGroteskBold = {
 const styles = StyleSheet.create({
 	container: {
 		flex: 1,
-		backgroundColor: Colors.landing.lightPurple,
+		backgroundColor: Colors.landing.white,
 	},
 	page: {
 		paddingVertical: 32,
@@ -267,14 +267,9 @@ const styles = StyleSheet.create({
 	},
 	cardShell: {
 		backgroundColor: Colors.landing.white,
-		borderRadius: 20,
+		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: 'rgba(52, 23, 85, 0.08)',
-		shadowColor: '#111111',
-		shadowOpacity: 0.08,
-		shadowOffset: { width: 0, height: 8 },
-		shadowRadius: 16,
-		elevation: 5,
+		borderColor: '#e5e7eb',
 		flex: 1,
 	},
 	cardLarge: {
@@ -476,7 +471,7 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.landing.black,
 		paddingHorizontal: 14,
 		paddingVertical: 8,
-		borderRadius: 8,
+		borderRadius: 6,
 	},
 	primaryButtonText: {
 		...fontBold,
@@ -491,9 +486,9 @@ const styles = StyleSheet.create({
 		backgroundColor: Colors.landing.white,
 		paddingHorizontal: 14,
 		paddingVertical: 8,
-		borderRadius: 8,
+		borderRadius: 6,
 		borderWidth: 1,
-		borderColor: '#e0e0e0',
+		borderColor: '#d1d5db',
 	},
 	secondaryButtonText: {
 		...fontBold,
@@ -551,8 +546,8 @@ const styles = StyleSheet.create({
 	purpleButton: {
 		width: '100%',
 		backgroundColor: Colors.landing.primaryPurple,
-		paddingVertical: 12,
-		borderRadius: 10,
+		paddingVertical: 10,
+		borderRadius: 8,
 		alignItems: 'center',
 	},
 	purpleButtonText: {
@@ -564,10 +559,10 @@ const styles = StyleSheet.create({
 		letterSpacing: 1.2,
 	},
 	statusCard: {
-		backgroundColor: 'rgba(234, 234, 244, 0.6)',
-		borderRadius: 18,
+		backgroundColor: Colors.landing.lightPurple,
+		borderRadius: 12,
 		borderWidth: 1,
-		borderColor: 'rgba(52, 23, 85, 0.12)',
+		borderColor: '#e5e7eb',
 		padding: 18,
 		gap: 12,
 	},

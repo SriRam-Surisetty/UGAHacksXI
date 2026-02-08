@@ -20,8 +20,8 @@ const navItems = [
     { label: 'Dashboard', route: '/Dashboard' },
     { label: 'Stock', route: '/Stock' },
     { label: 'Inventory', route: '/Inventory' },
-    { label: 'Support', route: '/Support' },
     { label: 'Users', route: '/Users' },
+    { label: 'Support', route: '/Support' },
 ];
 
 export default function AuthHeader({ activeRoute }: AuthHeaderProps) {

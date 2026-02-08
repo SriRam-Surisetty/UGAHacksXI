@@ -78,8 +78,8 @@ export default function SignupScreen() {
             if (response.data.access_token) {
                 await saveToken(response.data.access_token);
                 await saveUserId(email);
-                showAlert('Success', 'Account created successfully');
-                router.replace('/(tabs)');
+                showAlert('Success', 'Account created. Signing you in now.');
+                router.replace('/Dashboard');
             }
         } catch (error: any) {
             showAlert('Signup failed', error.response?.data?.msg || 'An error occurred');

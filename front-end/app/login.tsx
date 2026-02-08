@@ -79,7 +79,12 @@ export default function LoginScreen() {
                 router.replace('/Dashboard');
             }
         } catch (error: any) {
-            showAlert('Login failed', error.response?.data?.msg || 'An error occurred');
+            const status = error?.response?.status;
+            const message =
+                status === 401 || status === 400
+                    ? 'Invalid email or password.'
+                    : error.response?.data?.msg || 'An error occurred';
+            showAlert('Login failed', message);
         } finally {
             setIsLoading(false);
         }

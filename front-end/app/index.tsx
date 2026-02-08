@@ -58,17 +58,7 @@ function MobileUI() {
                     </View>
                 </View>
 
-                <View style={styles.featuresSection}>
-                    <Text style={styles.footerText}>Trusted by modern businesses</Text>
-                    <View style={styles.footerLinks}>
-                        <Link href="/Price" asChild>
-                            <TouchableOpacity>
-                                <Text style={styles.webFooterLink}>Pricing</Text>
-                            </TouchableOpacity>
-                        </Link>                        <TouchableOpacity><Text style={styles.linkText}>Contact</Text></TouchableOpacity>
-                        <TouchableOpacity><Text style={styles.linkText}>Terms</Text></TouchableOpacity>
-                    </View>
-                </View>
+
             </ScrollView>
 
             <FloatingChatButton />
@@ -151,19 +141,7 @@ function WebUI() {
                 </View>
 
                 {/* Footer */}
-                <View style={styles.webFooter}>
-                    <Text style={styles.webFooterText}>Trusted by modern businesses worldwide</Text>
-                    <View style={styles.webFooterLinks}>
-                        <Link href="/Price" asChild>
-                            <TouchableOpacity>
-                                <Text style={styles.webFooterLink}>Pricing</Text>
-                            </TouchableOpacity>
-                        </Link>                        <Text style={styles.webFooterDivider}>•</Text>
-                        <TouchableOpacity><Text style={styles.webFooterLink}>Contact</Text></TouchableOpacity>
-                        <Text style={styles.webFooterDivider}>•</Text>
-                        <TouchableOpacity><Text style={styles.webFooterLink}>Terms</Text></TouchableOpacity>
-                    </View>
-                </View>
+
             </ScrollView>
 
             <FloatingChatButton />

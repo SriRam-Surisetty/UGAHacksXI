@@ -4,12 +4,16 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
 import { useState } from 'react';
+import { useRouter } from 'expo-router'; // 1. Import useRouter
+
 
 export default function Support() {
+	const router = useRouter();
 	const [expandedFAQ, setExpandedFAQ] = useState<string | null>(null);
 
-	const handleContactSupport = () => {
+	const handleViewPlans = () => {
 		console.log('Contact support clicked');
+		router.push('/Price'); // 3. Redirect to Price.tsx
 		// TODO: Implement contact support functionality
 	};
 
@@ -48,7 +52,7 @@ export default function Support() {
 			<ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
 				<View style={styles.header}>
 					<Text style={styles.title}>Support Center</Text>
-					<Text style={styles.subtitle}>We're here to help you succeed with StockSense</Text>
+					<Text style={styles.subtitle}>We are here to help you succeed with StockSense</Text>
 				</View>
 
 				{/* Quick Contact Section */}
@@ -60,10 +64,9 @@ export default function Support() {
 								<Ionicons name="mail-outline" size={24} color={Colors.landing.primaryPurple} />
 							</View>
 							<Text style={styles.contactTitle}>Email Support</Text>
-							<TouchableOpacity onPress={() => Linking.openURL('mailto:stocksense@mailinator.com')}>
-								<Text style={styles.contactText}>stocksense@mailinator.com</Text>
+							<TouchableOpacity style={styles.ctaButton} onPress={handleViewPlans}>
+								<Text style={styles.ctaButtonText}>View plans</Text>
 							</TouchableOpacity>
-							<Text style={styles.responseTime}>Response in 24 hours</Text>
 						</View>
 
 						<View style={styles.contactCard}>
@@ -124,11 +127,10 @@ export default function Support() {
 
 				{/* Contact Form CTA */}
 				<View style={styles.ctaSection}>
-					<Text style={styles.ctaTitle}>Still need help?</Text>
-					<Text style={styles.ctaText}>Our support team is ready to assist you</Text>
-					<TouchableOpacity style={styles.ctaButton} onPress={handleContactSupport}>
-						<Text style={styles.ctaButtonText}>Contact Support</Text>
-						<Ionicons name="arrow-forward" size={18} color={Colors.landing.white} />
+					<Text style={styles.ctaTitle}>Want more fetures?</Text>
+					<Text style={styles.ctaText}>Upgrade your plan today</Text>
+					<TouchableOpacity style={styles.ctaButton} onPress={handleViewPlans}>
+						<Text style={styles.ctaButtonText}>View plans</Text>
 					</TouchableOpacity>
 				</View>
 			</ScrollView>
@@ -305,6 +307,7 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		backgroundColor: Colors.landing.white,
+		justifyContent: 'center',
 		paddingVertical: 12,
 		paddingHorizontal: 24,
 		borderRadius: 6,
@@ -313,6 +316,7 @@ const styles = StyleSheet.create({
 	ctaButtonText: {
 		color: Colors.landing.primaryPurple,
 		fontSize: 15,
+		textAlign: 'center',
 		fontWeight: '700',
 		fontFamily: 'SpaceGrotesk_600SemiBold',
 	},

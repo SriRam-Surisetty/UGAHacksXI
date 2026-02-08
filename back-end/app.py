@@ -185,6 +185,71 @@ def get_user_profile():
         app.logger.exception("/users/me failed")
         return jsonify({"error": str(e)}), 500
 
+
+@app.route("/users", methods=["GET", "POST"])
+@jwt_required()
+def manage_users():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        if user.uRole != 'admin':
+            return jsonify({"error": "Forbidden"}), 403
+
+        if request.method == "GET":
+            users = User.query.filter(User.orgID == user.orgID).order_by(User.email.asc()).all()
+            return jsonify({
+                "users": [
+                    {
+                        "userID": member.userID,
+                        "email": member.email,
+                        "role": member.uRole,
+                    }
+                    for member in users
+                ]
+            }), 200
+
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        email = data.get("email")
+        password = data.get("password")
+        role = data.get("role")
+
+        if not email or not password or not role:
+            return jsonify({"error": "Missing email, password, or role"}), 400
+
+        if role not in {"admin", "manager"}:
+            return jsonify({"error": "Invalid role"}), 400
+
+        existing_user = User.query.filter_by(email=email).first()
+        if existing_user:
+            return jsonify({"error": "User already exists"}), 409
+
+        new_user = User(
+            email=email,
+            hashed_pwd=generate_password_hash(password),
+            orgID=user.orgID,
+            uRole=role,
+        )
+        db.session.add(new_user)
+        db.session.commit()
+
+        return jsonify({
+            "msg": "User created",
+            "user": {
+                "userID": new_user.userID,
+                "email": new_user.email,
+                "role": new_user.uRole,
+            },
+        }), 201
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("/users failed")
+        return jsonify({"error": str(e)}), 500
+
 # Copy your login and dish routes here...
 
 # --- Inventory Routes ---

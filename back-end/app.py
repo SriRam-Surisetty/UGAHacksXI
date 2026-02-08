@@ -926,6 +926,141 @@ def update_or_delete_stock_batch(ing_id):
         app.logger.exception("/stock/batches update/delete failed")
         return jsonify({"error": str(e)}), 500
 
+
+@app.route("/stock/consume", methods=["POST"])
+@jwt_required()
+def consume_stock_for_dish():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        dish_id = data.get("dishID")
+        if not dish_id:
+            return jsonify({"error": "Missing dishID"}), 400
+
+        try:
+            cooked_qty = parse_quantity(data.get("quantity"), "quantity")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+
+        if cooked_qty is None or cooked_qty <= 0:
+            return jsonify({"error": "quantity must be greater than 0"}), 400
+
+        dish = Dish.query.filter(
+            Dish.dishID == dish_id,
+            Dish.orgID == user.orgID,
+            Dish.dishName != STOCK_DISH_NAME,
+        ).first()
+        if not dish:
+            return jsonify({"error": "Dish not found"}), 404
+
+        recipe_rows = (
+            db.session.query(DishIngredient, Ingredient)
+            .join(Ingredient, Ingredient.ingID == DishIngredient.ingID)
+            .filter(DishIngredient.dishID == dish_id)
+            .all()
+        )
+
+        if not recipe_rows:
+            return jsonify({"error": "Dish has no ingredients"}), 400
+
+        stock_dish = Dish.query.filter(
+            Dish.orgID == user.orgID,
+            Dish.dishName == STOCK_DISH_NAME,
+        ).first()
+
+        if not stock_dish:
+            return jsonify({"error": "No stock batches available"}), 409
+
+        deductions = []
+
+        for recipe_link, recipe_ing in recipe_rows:
+            if recipe_link.qty is None or not recipe_link.unit:
+                return jsonify({
+                    "error": "Recipe is missing qty/unit",
+                    "ingredient": recipe_ing.ingName,
+                }), 400
+
+            required_qty = recipe_link.qty * cooked_qty
+
+            batches = Ingredient.query.filter(
+                Ingredient.orgID == user.orgID,
+                Ingredient.ingName == recipe_ing.ingName,
+                Ingredient.category == recipe_ing.category,
+                or_(Ingredient.expiry.isnot(None), Ingredient.batchNum.isnot(None)),
+            ).order_by(
+                Ingredient.expiry.is_(None),
+                Ingredient.expiry.asc(),
+                Ingredient.ingID.asc(),
+            ).all()
+
+            if not batches:
+                return jsonify({
+                    "error": "Insufficient stock",
+                    "ingredient": recipe_ing.ingName,
+                }), 409
+
+            links = {
+                link.ingID: link
+                for link in DishIngredient.query.filter(
+                    DishIngredient.dishID == stock_dish.dishID,
+                    DishIngredient.ingID.in_([batch.ingID for batch in batches]),
+                ).all()
+            }
+
+            total_available = sum(
+                link.qty for link in links.values()
+                if link.qty is not None and link.unit == recipe_link.unit
+            )
+
+            if total_available < required_qty:
+                return jsonify({
+                    "error": "Insufficient stock",
+                    "ingredient": recipe_ing.ingName,
+                    "required": float(required_qty),
+                    "available": float(total_available),
+                    "unit": recipe_link.unit,
+                }), 409
+
+            remaining = required_qty
+            for batch in batches:
+                if remaining <= 0:
+                    break
+                link = links.get(batch.ingID)
+                if not link or link.qty is None:
+                    continue
+                if link.unit != recipe_link.unit:
+                    continue
+
+                take = min(link.qty, remaining)
+                link.qty = link.qty - take
+                remaining -= take
+                deductions.append({
+                    "ingID": batch.ingID,
+                    "ingName": batch.ingName,
+                    "batchNum": batch.batchNum,
+                    "expiry": batch.expiry.isoformat() if batch.expiry else None,
+                    "qty": float(take),
+                    "unit": link.unit,
+                })
+
+        db.session.commit()
+        return jsonify({
+            "msg": "Stock updated",
+            "dishID": dish.dishID,
+            "quantity": float(cooked_qty),
+            "deductions": deductions,
+        }), 200
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("/stock/consume failed")
+        return jsonify({"error": str(e)}), 500
+
 # --- Gemini Chatbot Route ---
 import google.generativeai as genai
 

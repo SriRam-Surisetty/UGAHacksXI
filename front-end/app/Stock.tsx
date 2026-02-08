@@ -28,12 +28,17 @@ type Batch = {
 
 type StatusFilter = 'all' | 'healthy' | 'expiring' | 'expired';
 
-type ModalType = 'add' | 'edit' | 'delete' | null;
+type ModalType = 'add' | 'edit' | 'delete' | 'consume' | null;
 
 type IngredientOption = {
     ingID: number;
     ingName: string;
     category?: string | null;
+};
+
+type DishOption = {
+    dishID: number;
+    dishName: string;
 };
 
 const statusOptions: { label: string; value: StatusFilter }[] = [
@@ -63,6 +68,10 @@ export default function Stock() {
     const [availableIngredients, setAvailableIngredients] = useState<IngredientOption[]>([]);
     const [ingredientSearch, setIngredientSearch] = useState('');
     const [selectedIngredient, setSelectedIngredient] = useState<IngredientOption | null>(null);
+    const [availableDishes, setAvailableDishes] = useState<DishOption[]>([]);
+    const [dishSearch, setDishSearch] = useState('');
+    const [selectedDish, setSelectedDish] = useState<DishOption | null>(null);
+    const [cookedQtyInput, setCookedQtyInput] = useState('');
 
     const today = useMemo(() => new Date(), []);
 
@@ -140,8 +149,14 @@ export default function Stock() {
         setModalError(null);
         setSelectedIngredient(null);
         setIngredientSearch('');
+        setSelectedDish(null);
+        setDishSearch('');
+        setCookedQtyInput('');
         if (type === 'add') {
             loadAvailableIngredients();
+        }
+        if (type === 'consume') {
+            loadAvailableDishes();
         }
     };
 
@@ -154,6 +169,8 @@ export default function Stock() {
         setUnitInput('');
         setModalError(null);
         setSelectedIngredient(null);
+        setSelectedDish(null);
+        setCookedQtyInput('');
     };
 
     const loadAvailableIngredients = async () => {
@@ -214,6 +231,21 @@ export default function Stock() {
                 await api.delete(`/stock/batches/${selectedBatch.id}`);
             }
 
+            if (modalType === 'consume') {
+                if (!selectedDish) {
+                    setModalError('Select a dish first.');
+                    return;
+                }
+                if (!cookedQtyInput.trim()) {
+                    setModalError('Enter the cooked quantity.');
+                    return;
+                }
+                await api.post('/stock/consume', {
+                    dishID: selectedDish.dishID,
+                    quantity: cookedQtyInput.trim(),
+                });
+            }
+
             setRefreshKey((prev) => prev + 1);
             closeModal();
         } catch (saveError) {
@@ -228,6 +260,27 @@ export default function Stock() {
         if (!needle) return availableIngredients;
         return availableIngredients.filter((ing) => ing.ingName.toLowerCase().includes(needle));
     }, [availableIngredients, ingredientSearch]);
+
+    const filteredDishes = useMemo(() => {
+        const needle = dishSearch.trim().toLowerCase();
+        if (!needle) return availableDishes;
+        return availableDishes.filter((dish) => dish.dishName.toLowerCase().includes(needle));
+    }, [availableDishes, dishSearch]);
+
+    const loadAvailableDishes = async () => {
+        try {
+            const response = await api.get('/inventory/dishes');
+            const dishes = response.data?.dishes ?? [];
+            setAvailableDishes(
+                dishes.map((dish: { dishID: number; dishName?: string }) => ({
+                    dishID: dish.dishID,
+                    dishName: dish.dishName || '-',
+                }))
+            );
+        } catch (fetchError) {
+            setModalError('Unable to load dishes.');
+        }
+    };
 
     useEffect(() => {
         const fetchBatches = async () => {
@@ -269,9 +322,14 @@ export default function Stock() {
                             <Text style={styles.title}>Batch Inventory</Text>
                             <Text style={styles.subtitle}>Manage stock by batch and expiry date</Text>
                         </View>
-                        <TouchableOpacity style={styles.primaryButton} onPress={() => openModal('add')}>
-                            <Text style={styles.primaryButtonText}>Add Batch</Text>
-                        </TouchableOpacity>
+                        <View style={styles.headerActions}>
+                            <TouchableOpacity style={styles.primaryButton} onPress={() => openModal('add')}>
+                                <Text style={styles.primaryButtonText}>Add Batch</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity style={styles.secondaryButton} onPress={() => openModal('consume')}>
+                                <Text style={styles.secondaryButtonText}>Log Cooked</Text>
+                            </TouchableOpacity>
+                        </View>
                     </View>
 
                     <View style={styles.statsGrid}>
@@ -424,6 +482,7 @@ export default function Stock() {
                             {modalType === 'edit' && 'Edit Batch'}
                             {modalType === 'delete' && 'Delete Batch'}
                             {modalType === 'add' && 'Add Batch'}
+                            {modalType === 'consume' && 'Log Cooked Dish'}
                         </Text>
                         {modalType === 'edit' && selectedBatch && (
                             <View style={styles.modalBody}>
@@ -525,6 +584,40 @@ export default function Stock() {
                             </View>
                         )}
 
+                        {modalType === 'consume' && (
+                            <View style={styles.modalBody}>
+                                <Text style={styles.modalLabel}>Dish</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="Search dishes..."
+                                    value={dishSearch}
+                                    onChangeText={setDishSearch}
+                                />
+                                <View style={styles.ingredientList}>
+                                    {filteredDishes.map((dish) => (
+                                        <TouchableOpacity
+                                            key={dish.dishID}
+                                            style={styles.ingredientRow}
+                                            onPress={() => setSelectedDish(dish)}
+                                        >
+                                            <Text style={styles.ingredientName}>{dish.dishName}</Text>
+                                        </TouchableOpacity>
+                                    ))}
+                                </View>
+                                {selectedDish && (
+                                    <Text style={styles.modalValue}>Selected: {selectedDish.dishName}</Text>
+                                )}
+                                <Text style={styles.modalLabel}>Cooked quantity</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="0"
+                                    keyboardType="numeric"
+                                    value={cookedQtyInput}
+                                    onChangeText={setCookedQtyInput}
+                                />
+                            </View>
+                        )}
+
                         {modalError && <Text style={styles.modalError}>{modalError}</Text>}
 
                         <View style={styles.modalActions}>
@@ -588,6 +681,12 @@ const styles = StyleSheet.create({
         gap: 16,
         flexWrap: 'wrap',
         marginBottom: 24,
+    },
+    headerActions: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 12,
+        flexWrap: 'wrap',
     },
     title: {
         fontSize: 24,

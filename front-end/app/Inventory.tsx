@@ -5,6 +5,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
 import FloatingChatButton from '@/components/FloatingChatButton';
+import FoodThumbnail from '@/components/FoodThumbnail';
 import api from '@/services/api';
 
 type DishRow = {
@@ -80,6 +81,9 @@ export default function Inventory() {
 	const [selectedRow, setSelectedRow] = useState<SelectedRow | null>(null);
 	const [dishIngredients, setDishIngredients] = useState<DishIngredientDetail[]>([]);
 	const [dishDetailLoading, setDishDetailLoading] = useState(false);
+	const [currentPage, setCurrentPage] = useState(1);
+	const [itemsPerPage, setItemsPerPage] = useState(10);
+	const [showPerPageMenu, setShowPerPageMenu] = useState(false);
 
 	useEffect(() => {
 		if (Platform.OS !== 'web') return;
@@ -174,6 +178,13 @@ export default function Inventory() {
 	const addLabel = activeTab === 'dishes' ? 'Add Dish' : 'Add Ingredient';
 	const tableRows = activeTab === 'dishes' ? dishesData : ingredientsData;
 	const categoryLabel = category || 'All Categories';
+
+	const totalPages = Math.max(1, Math.ceil(tableRows.length / itemsPerPage));
+	const paginatedRows = tableRows.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+	useEffect(() => {
+		setCurrentPage(1);
+	}, [activeTab, search, category, itemsPerPage]);
 
 	const openModal = (type: ModalType, row?: SelectedRow) => {
 		setModalType(type);
@@ -400,19 +411,30 @@ export default function Inventory() {
 					<View style={styles.filtersCard}>
 						<View style={styles.filterRow}>
 							<View style={styles.searchWrapper}>
-								<TextInput
-									style={styles.searchInput}
-									placeholder="Search master list..."
-									value={search}
-									onChangeText={setSearch}
-								/>
+								<View style={styles.searchInputWrapper}>
+									<Ionicons name="search" size={16} color="#9ca3af" style={styles.searchIcon} />
+									<TextInput
+										style={[styles.searchInput, Platform.OS === 'web' && ({ outlineStyle: 'none' } as any)]}
+										placeholder={activeTab === 'dishes' ? 'Search dishes...' : 'Search ingredients...'}
+										placeholderTextColor="#9ca3af"
+										value={search}
+										onChangeText={setSearch}
+									/>
+									{search.length > 0 && (
+										<TouchableOpacity onPress={() => setSearch('')} style={styles.searchClear}>
+											<Ionicons name="close-circle" size={16} color="#9ca3af" />
+										</TouchableOpacity>
+									)}
+								</View>
 							</View>
 							<TouchableOpacity
 								style={[styles.selectButton, activeTab !== 'ingredients' && styles.selectButtonDisabled]}
 								onPress={() => activeTab === 'ingredients' && setShowCategoryMenu((prev) => !prev)}
 								disabled={activeTab !== 'ingredients'}
 							>
+								<Ionicons name="filter" size={14} color={activeTab === 'ingredients' ? '#6b7280' : '#d1d5db'} />
 								<Text style={styles.selectText}>{categoryLabel}</Text>
+								<Ionicons name="chevron-down" size={14} color={activeTab === 'ingredients' ? '#6b7280' : '#d1d5db'} />
 							</TouchableOpacity>
 						</View>
 						{activeTab === 'ingredients' && showCategoryMenu && (
@@ -440,6 +462,7 @@ export default function Inventory() {
 
 					<View style={styles.tableCard}>
 						<View style={styles.tableHeader}>
+							<View style={styles.cellThumb} />
 							{activeTab === 'dishes' ? (
 								<>
 									<View style={[styles.tableHeaderCell, styles.cellName]}>
@@ -484,8 +507,11 @@ export default function Inventory() {
 								</View>
 							</View>
 						)}
-						{!isLoading && !error && tableRows.map((row) => (
+						{!isLoading && !error && paginatedRows.map((row) => (
 							<View key={row.id} style={styles.tableRow}>
+								<View style={styles.cellThumb}>
+									<FoodThumbnail name={row.name} size={36} type={activeTab === 'dishes' ? 'meal' : 'ingredient'} />
+								</View>
 								<View style={[styles.tableCell, styles.cellName]}>
 									{activeTab === 'dishes' ? (
 										<TouchableOpacity onPress={() => openModal('view-dish', { id: row.id, name: row.name })}>
@@ -524,6 +550,68 @@ export default function Inventory() {
 							</View>
 						))}
 					</View>
+
+					{/* Pagination */}
+					{!isLoading && !error && tableRows.length > 0 && (
+						<View style={styles.paginationBar}>
+							<View style={styles.paginationLeft}>
+								<Text style={styles.paginationLabel}>Rows per page:</Text>
+								<TouchableOpacity
+									style={styles.perPageButton}
+									onPress={() => setShowPerPageMenu((prev) => !prev)}
+								>
+									<Text style={styles.perPageText}>{itemsPerPage}</Text>
+									<Ionicons name="chevron-down" size={12} color="#6b7280" />
+								</TouchableOpacity>
+								{showPerPageMenu && (
+									<View style={styles.perPageMenu}>
+										{[5, 10, 25, 50].map((n) => (
+											<TouchableOpacity
+												key={n}
+												style={[styles.perPageOption, n === itemsPerPage && styles.perPageOptionActive]}
+												onPress={() => { setItemsPerPage(n); setShowPerPageMenu(false); }}
+											>
+												<Text style={[styles.perPageOptionText, n === itemsPerPage && styles.perPageOptionTextActive]}>{n}</Text>
+											</TouchableOpacity>
+										))}
+									</View>
+								)}
+							</View>
+							<Text style={styles.paginationInfo}>
+								{(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, tableRows.length)} of {tableRows.length}
+							</Text>
+							<View style={styles.paginationButtons}>
+								<TouchableOpacity
+									style={[styles.pageButton, currentPage <= 1 && styles.pageButtonDisabled]}
+									onPress={() => setCurrentPage(1)}
+									disabled={currentPage <= 1}
+								>
+									<Ionicons name="play-back" size={12} color={currentPage <= 1 ? '#d1d5db' : '#374151'} />
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={[styles.pageButton, currentPage <= 1 && styles.pageButtonDisabled]}
+									onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
+									disabled={currentPage <= 1}
+								>
+									<Ionicons name="chevron-back" size={14} color={currentPage <= 1 ? '#d1d5db' : '#374151'} />
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={[styles.pageButton, currentPage >= totalPages && styles.pageButtonDisabled]}
+									onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+									disabled={currentPage >= totalPages}
+								>
+									<Ionicons name="chevron-forward" size={14} color={currentPage >= totalPages ? '#d1d5db' : '#374151'} />
+								</TouchableOpacity>
+								<TouchableOpacity
+									style={[styles.pageButton, currentPage >= totalPages && styles.pageButtonDisabled]}
+									onPress={() => setCurrentPage(totalPages)}
+									disabled={currentPage >= totalPages}
+								>
+									<Ionicons name="play-forward" size={12} color={currentPage >= totalPages ? '#d1d5db' : '#374151'} />
+								</TouchableOpacity>
+							</View>
+						</View>
+					)}
 				</View>
 			</ScrollView>
 
@@ -787,25 +875,38 @@ const styles = StyleSheet.create({
 		flex: 1,
 		minWidth: 220,
 	},
-	searchInput: {
-		width: '100%',
-		paddingHorizontal: 12,
-		paddingVertical: 10,
+	searchInputWrapper: {
+		flexDirection: 'row',
+		alignItems: 'center',
 		borderWidth: 1,
 		borderColor: '#d1d5db',
-		borderRadius: 6,
-		fontSize: 13,
+		borderRadius: 8,
 		backgroundColor: Colors.landing.white,
+		paddingHorizontal: 12,
+	},
+	searchIcon: {
+		marginRight: 8,
+	},
+	searchInput: {
+		flex: 1,
+		paddingVertical: 10,
+		fontSize: 13,
+		color: '#111827',
+	},
+	searchClear: {
+		paddingLeft: 8,
 	},
 	selectButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
 		paddingHorizontal: 12,
 		paddingVertical: 10,
 		borderWidth: 1,
 		borderColor: '#d1d5db',
-		borderRadius: 6,
+		borderRadius: 8,
 		backgroundColor: Colors.landing.white,
-		minWidth: 160,
-		alignItems: 'center',
+		minWidth: 180,
 	},
 	selectText: {
 		fontSize: 13,
@@ -850,6 +951,15 @@ const styles = StyleSheet.create({
 		flexDirection: 'row',
 		alignItems: 'center',
 		flex: 1,
+	},
+	cellThumb: {
+		width: 60,
+		minWidth: 60,
+		flexShrink: 0,
+		flexGrow: 0,
+		justifyContent: 'center',
+		alignItems: 'center',
+		paddingVertical: 8,
 	},
 	cellName: {
 		flex: 1.6,
@@ -1085,5 +1195,98 @@ const styles = StyleSheet.create({
 		backgroundColor: '#f3f4f6',
 		alignItems: 'center',
 		justifyContent: 'center',
+	},
+	paginationBar: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'flex-end',
+		gap: 16,
+		paddingVertical: 14,
+		paddingHorizontal: 16,
+		borderTopWidth: 1,
+		borderTopColor: '#e5e7eb',
+		backgroundColor: Colors.landing.white,
+		borderBottomLeftRadius: 8,
+		borderBottomRightRadius: 8,
+	},
+	paginationLeft: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 6,
+		position: 'relative',
+	},
+	paginationLabel: {
+		fontSize: 12,
+		color: '#6b7280',
+	},
+	paginationInfo: {
+		fontSize: 12,
+		color: '#6b7280',
+		fontVariant: ['tabular-nums'],
+	},
+	paginationButtons: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	pageButton: {
+		width: 28,
+		height: 28,
+		borderRadius: 6,
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		alignItems: 'center',
+		justifyContent: 'center',
+		backgroundColor: Colors.landing.white,
+	},
+	pageButtonDisabled: {
+		opacity: 0.4,
+	},
+	perPageButton: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		borderRadius: 6,
+		paddingHorizontal: 8,
+		paddingVertical: 4,
+		backgroundColor: Colors.landing.white,
+	},
+	perPageText: {
+		fontSize: 12,
+		color: '#374151',
+		fontWeight: '500',
+	},
+	perPageMenu: {
+		position: 'absolute',
+		bottom: 32,
+		left: 60,
+		backgroundColor: Colors.landing.white,
+		borderWidth: 1,
+		borderColor: '#e5e7eb',
+		borderRadius: 8,
+		overflow: 'hidden',
+		shadowColor: '#000',
+		shadowOffset: { width: 0, height: 2 },
+		shadowOpacity: 0.1,
+		shadowRadius: 4,
+		elevation: 4,
+		zIndex: 10,
+	},
+	perPageOption: {
+		paddingVertical: 8,
+		paddingHorizontal: 16,
+	},
+	perPageOptionActive: {
+		backgroundColor: Colors.landing.lightPurple,
+	},
+	perPageOptionText: {
+		fontSize: 12,
+		color: '#374151',
+	},
+	perPageOptionTextActive: {
+		color: Colors.landing.primaryPurple,
+		fontWeight: '600',
 	},
 });

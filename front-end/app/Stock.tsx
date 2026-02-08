@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import {
     Modal,
+    Platform,
     SafeAreaView,
     ScrollView,
     StyleSheet,
@@ -14,6 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
 import FloatingChatButton from '@/components/FloatingChatButton';
+import FoodThumbnail from '@/components/FoodThumbnail';
 import api from '@/services/api';
 
 type Batch = {
@@ -72,6 +74,9 @@ export default function Stock() {
     const [dishSearch, setDishSearch] = useState('');
     const [selectedDish, setSelectedDish] = useState<DishOption | null>(null);
     const [cookedQtyInput, setCookedQtyInput] = useState('');
+    const [currentPage, setCurrentPage] = useState(1);
+    const [itemsPerPage, setItemsPerPage] = useState(10);
+    const [showPerPageMenu, setShowPerPageMenu] = useState(false);
 
     const today = useMemo(() => new Date(), []);
 
@@ -129,6 +134,13 @@ export default function Stock() {
 
         return result;
     }, [batches, search, sortField, sortDirection, statusFilter]);
+
+    const totalPages = Math.max(1, Math.ceil(filtered.length / itemsPerPage));
+    const paginatedRows = filtered.slice((currentPage - 1) * itemsPerPage, currentPage * itemsPerPage);
+
+    useEffect(() => {
+        setCurrentPage(1);
+    }, [search, statusFilter, itemsPerPage]);
 
     const toggleSort = (field: keyof Batch) => {
         if (sortField === field) {
@@ -354,16 +366,26 @@ export default function Stock() {
                     <View style={styles.filtersCard}>
                         <View style={styles.filterRow}>
                             <View style={styles.searchWrapper}>
-                                <TextInput
-                                    style={styles.searchInput}
-                                    placeholder="Search by ingredient or batch ID..."
-                                    value={search}
-                                    onChangeText={setSearch}
-                                />
+                                <View style={styles.searchInputWrapper}>
+                                    <Ionicons name="search" size={16} color="#9ca3af" style={styles.searchIcon} />
+                                    <TextInput
+                                        style={[styles.searchInput, Platform.OS === 'web' && ({ outlineStyle: 'none' } as any)]}
+                                        placeholder="Search by ingredient or batch ID..."
+                                        placeholderTextColor="#9ca3af"
+                                        value={search}
+                                        onChangeText={setSearch}
+                                    />
+                                    {search.length > 0 && (
+                                        <TouchableOpacity onPress={() => setSearch('')} style={styles.searchClear}>
+                                            <Ionicons name="close-circle" size={16} color="#9ca3af" />
+                                        </TouchableOpacity>
+                                    )}
+                                </View>
                             </View>
                             <TouchableOpacity style={styles.selectButton} onPress={() => setStatusPickerOpen(true)}>
+                                <Ionicons name="filter" size={14} color="#6b7280" />
                                 <Text style={styles.selectText}>{statusLabel}</Text>
-                                <Ionicons name="chevron-down" size={16} color="#6b7280" />
+                                <Ionicons name="chevron-down" size={14} color="#6b7280" />
                             </TouchableOpacity>
                             <TouchableOpacity style={styles.primaryButton} onPress={() => toggleSort('expiry')}>
                                 <Text style={styles.primaryButtonText}>Sort by Expiry</Text>
@@ -384,6 +406,7 @@ export default function Stock() {
 
                     <View style={styles.tableCard}>
                         <View style={styles.tableHeader}>
+                            <View style={styles.cellThumb} />
                             <TouchableOpacity style={[styles.tableCell, styles.cellName]} onPress={() => toggleSort('name')}>
                                 <Text style={styles.tableHeaderText}>Ingredient</Text>
                                 <Ionicons name="swap-vertical" size={12} color="#6b7280" />
@@ -432,10 +455,13 @@ export default function Stock() {
                                 </View>
                             </View>
                         )}
-                        {!isLoading && !error && filtered.map((batch) => {
+                        {!isLoading && !error && paginatedRows.map((batch) => {
                             const status = getStatus(batch.expiry);
                             return (
                                 <View key={batch.id} style={styles.tableRow}>
+                                    <View style={styles.cellThumb}>
+                                        <FoodThumbnail name={batch.name} size={36} type="ingredient" />
+                                    </View>
                                     <View style={[styles.tableCell, styles.cellName]}>
                                         <Text style={styles.cellPrimary}>{batch.name}</Text>
                                     </View>
@@ -472,6 +498,68 @@ export default function Stock() {
                             );
                         })}
                     </View>
+
+                    {/* Pagination */}
+                    {!isLoading && !error && filtered.length > 0 && (
+                        <View style={styles.paginationBar}>
+                            <View style={styles.paginationLeft}>
+                                <Text style={styles.paginationLabel}>Rows per page:</Text>
+                                <TouchableOpacity
+                                    style={styles.perPageButton}
+                                    onPress={() => setShowPerPageMenu((prev) => !prev)}
+                                >
+                                    <Text style={styles.perPageText}>{itemsPerPage}</Text>
+                                    <Ionicons name="chevron-down" size={12} color="#6b7280" />
+                                </TouchableOpacity>
+                                {showPerPageMenu && (
+                                    <View style={styles.perPageMenu}>
+                                        {[5, 10, 25, 50].map((n) => (
+                                            <TouchableOpacity
+                                                key={n}
+                                                style={[styles.perPageOption, n === itemsPerPage && styles.perPageOptionActive]}
+                                                onPress={() => { setItemsPerPage(n); setShowPerPageMenu(false); }}
+                                            >
+                                                <Text style={[styles.perPageOptionText, n === itemsPerPage && styles.perPageOptionTextActive]}>{n}</Text>
+                                            </TouchableOpacity>
+                                        ))}
+                                    </View>
+                                )}
+                            </View>
+                            <Text style={styles.paginationInfo}>
+                                {(currentPage - 1) * itemsPerPage + 1}–{Math.min(currentPage * itemsPerPage, filtered.length)} of {filtered.length}
+                            </Text>
+                            <View style={styles.paginationButtons}>
+                                <TouchableOpacity
+                                    style={[styles.pageButton, currentPage <= 1 && styles.pageButtonDisabled]}
+                                    onPress={() => setCurrentPage(1)}
+                                    disabled={currentPage <= 1}
+                                >
+                                    <Ionicons name="play-back" size={12} color={currentPage <= 1 ? '#d1d5db' : '#374151'} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.pageButton, currentPage <= 1 && styles.pageButtonDisabled]}
+                                    onPress={() => setCurrentPage((p) => Math.max(1, p - 1))}
+                                    disabled={currentPage <= 1}
+                                >
+                                    <Ionicons name="chevron-back" size={14} color={currentPage <= 1 ? '#d1d5db' : '#374151'} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.pageButton, currentPage >= totalPages && styles.pageButtonDisabled]}
+                                    onPress={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
+                                    disabled={currentPage >= totalPages}
+                                >
+                                    <Ionicons name="chevron-forward" size={14} color={currentPage >= totalPages ? '#d1d5db' : '#374151'} />
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={[styles.pageButton, currentPage >= totalPages && styles.pageButtonDisabled]}
+                                    onPress={() => setCurrentPage(totalPages)}
+                                    disabled={currentPage >= totalPages}
+                                >
+                                    <Ionicons name="play-forward" size={12} color={currentPage >= totalPages ? '#d1d5db' : '#374151'} />
+                                </TouchableOpacity>
+                            </View>
+                        </View>
+                    )}
                 </View>
             </ScrollView>
 
@@ -777,15 +865,26 @@ const styles = StyleSheet.create({
         flex: 1,
         minWidth: 220,
     },
-    searchInput: {
-        width: '100%',
-        paddingHorizontal: 12,
-        paddingVertical: 10,
+    searchInputWrapper: {
+        flexDirection: 'row',
+        alignItems: 'center',
         borderWidth: 1,
         borderColor: '#d1d5db',
-        borderRadius: 6,
-        fontSize: 13,
+        borderRadius: 8,
         backgroundColor: Colors.landing.white,
+        paddingHorizontal: 12,
+    },
+    searchIcon: {
+        marginRight: 8,
+    },
+    searchInput: {
+        flex: 1,
+        paddingVertical: 10,
+        fontSize: 13,
+        color: '#111827',
+    },
+    searchClear: {
+        paddingLeft: 8,
     },
     selectButton: {
         flexDirection: 'row',
@@ -795,10 +894,9 @@ const styles = StyleSheet.create({
         paddingVertical: 10,
         borderWidth: 1,
         borderColor: '#d1d5db',
-        borderRadius: 6,
+        borderRadius: 8,
         backgroundColor: Colors.landing.white,
-        minWidth: 140,
-        justifyContent: 'space-between',
+        minWidth: 160,
     },
     selectText: {
         fontSize: 13,
@@ -835,6 +933,15 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         gap: 6,
+    },
+    cellThumb: {
+        width: 60,
+        minWidth: 60,
+        flexShrink: 0,
+        flexGrow: 0,
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingVertical: 8,
     },
     cellName: {
         flex: 2.2,
@@ -1002,5 +1109,98 @@ const styles = StyleSheet.create({
     pickerText: {
         fontSize: 14,
         color: '#111827',
+    },
+    paginationBar: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'flex-end',
+        gap: 16,
+        paddingVertical: 14,
+        paddingHorizontal: 16,
+        borderTopWidth: 1,
+        borderTopColor: '#e5e7eb',
+        backgroundColor: Colors.landing.white,
+        borderBottomLeftRadius: 8,
+        borderBottomRightRadius: 8,
+    },
+    paginationLeft: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        position: 'relative',
+    },
+    paginationLabel: {
+        fontSize: 12,
+        color: '#6b7280',
+    },
+    paginationInfo: {
+        fontSize: 12,
+        color: '#6b7280',
+        fontVariant: ['tabular-nums'],
+    },
+    paginationButtons: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    pageButton: {
+        width: 28,
+        height: 28,
+        borderRadius: 6,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        alignItems: 'center',
+        justifyContent: 'center',
+        backgroundColor: Colors.landing.white,
+    },
+    pageButtonDisabled: {
+        opacity: 0.4,
+    },
+    perPageButton: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 6,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        backgroundColor: Colors.landing.white,
+    },
+    perPageText: {
+        fontSize: 12,
+        color: '#374151',
+        fontWeight: '500',
+    },
+    perPageMenu: {
+        position: 'absolute',
+        bottom: 32,
+        left: 60,
+        backgroundColor: Colors.landing.white,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+        borderRadius: 8,
+        overflow: 'hidden',
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 4,
+        zIndex: 10,
+    },
+    perPageOption: {
+        paddingVertical: 8,
+        paddingHorizontal: 16,
+    },
+    perPageOptionActive: {
+        backgroundColor: Colors.landing.lightPurple,
+    },
+    perPageOptionText: {
+        fontSize: 12,
+        color: '#374151',
+    },
+    perPageOptionTextActive: {
+        color: Colors.landing.primaryPurple,
+        fontWeight: '600',
     },
 });

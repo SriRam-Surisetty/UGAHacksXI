@@ -16,7 +16,6 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import api from '@/services/api';
-import { saveToken, saveUserId } from '@/services/storage';
 
 const { width } = Dimensions.get('window');
 
@@ -75,12 +74,13 @@ export default function SignupScreen() {
                 orgName,
             });
 
-            if (response.data.access_token) {
-                await saveToken(response.data.access_token);
-                await saveUserId(email);
-                showAlert('Success', 'Account created. Signing you in now.');
-                router.replace('/Dashboard');
+            if (response.status === 201) {
+                showAlert('Success', 'Account created. Please sign in.');
+                router.replace('/login');
+                return;
             }
+
+            showAlert('Signup failed', response.data?.msg || 'An error occurred');
         } catch (error: any) {
             showAlert('Signup failed', error.response?.data?.msg || 'An error occurred');
         } finally {

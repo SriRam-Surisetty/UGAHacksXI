@@ -50,7 +50,7 @@ export default function AuditLogs() {
     const [resourceFilter, setResourceFilter] = useState('');
 
     const ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGIN_FAILED', 'EXPORT', 'IMPORT', 'CONSUME', 'CHAT'];
-    const RESOURCES = ['auth', 'user', 'org', 'ingredient', 'dish', 'batch', 'stock', 'chat'];
+    const RESOURCES = ['auth', 'user', 'org', 'ingredient', 'dish', 'batch', 'stock', 'chat', 'settings'];
 
     useEffect(() => {
         let isMounted = true;
@@ -246,6 +246,7 @@ export default function AuditLogs() {
                         <Text style={[styles.tableCellUser, styles.tableHeaderText]}>User</Text>
                         <Text style={[styles.tableCellAction, styles.tableHeaderText]}>Action</Text>
                         <Text style={[styles.tableCellResource, styles.tableHeaderText]}>Resource</Text>
+                        <Text style={[styles.tableCellIp, styles.tableHeaderText]}>IP Address</Text>
                         <Text style={[styles.tableCellDetails, styles.tableHeaderText]}>Details</Text>
                     </View>
                     {isLoading ? (
@@ -267,6 +268,9 @@ export default function AuditLogs() {
                                         </View>
                                     </View>
                                     <Text style={styles.tableCellResource}>{log.resource_type}</Text>
+                                    <Text style={styles.tableCellIp} numberOfLines={1}>
+                                        {log.ip_address || '-'}
+                                    </Text>
                                     <Text style={styles.tableCellDetails} numberOfLines={2}>
                                         {formatDetails(log.details)}
                                     </Text>
@@ -422,6 +426,11 @@ const styles = StyleSheet.create({
     },
     tableCellResource: {
         width: 100,
+        fontSize: 12,
+        color: '#374151',
+    },
+    tableCellIp: {
+        width: 120,
         fontSize: 12,
         color: '#374151',
     },

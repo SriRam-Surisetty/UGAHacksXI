@@ -348,7 +348,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'center',
         justifyContent: 'space-between',
-        paddingHorizontal: 20,
+        paddingHorizontal: 24,
         paddingVertical: 16,
         borderBottomWidth: 1,
         borderBottomColor: 'rgba(99, 102, 241, 0.1)',
@@ -401,7 +401,7 @@ const styles = StyleSheet.create({
         flex: 1,
     },
     messageList: {
-        padding: 20,
+        padding: 24,
         paddingBottom: 100,
     },
     messageRow: {
@@ -478,7 +478,7 @@ const styles = StyleSheet.create({
         backgroundColor: '#9ca3af',
     },
     quickPromptsContainer: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 24,
         paddingBottom: 20,
     },
     quickPromptsTitle: {
@@ -506,7 +506,7 @@ const styles = StyleSheet.create({
         fontWeight: '500',
     },
     inputArea: {
-        paddingHorizontal: 16,
+        paddingHorizontal: 24,
         paddingTop: 8,
         paddingBottom: Platform.OS === 'ios' ? 24 : 16,
         backgroundColor: '#ffffff',

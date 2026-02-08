@@ -74,7 +74,7 @@ const styles = StyleSheet.create({
         borderBottomColor: '#e5e7eb',
     },
     inner: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 24,
         paddingVertical: 16,
         flexDirection: 'row',
         alignItems: 'center',

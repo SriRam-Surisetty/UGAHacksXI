@@ -29,14 +29,21 @@ app.logger.setLevel(logging.DEBUG)
 # Point this to the exact location of your downloaded ca-certificate.crt
 CA_CERT_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'certs', 'ca-certificate.crt')
 
-# We switch to 'mysqlconnector' for better SSL support with DigitalOcean
-app.config["SQLALCHEMY_DATABASE_URI"] = (
-    f"mysql+mysqlconnector://doadmin:AVNS_E1MUlQ8IweUl4B3L72k@"
-    f"db-mysql-nyc3-02019-do-user-33079250-0.j.db.ondigitalocean.com:25060/defaultdb"
-    f"?ssl_ca={CA_CERT_PATH}"
+# Database URI and JWT secret are read from environment variables.
+# Fallback values are provided for local development only.
+_DB_USER = os.getenv("DB_USER", "doadmin")
+_DB_PASS = os.getenv("DB_PASS", "AVNS_E1MUlQ8IweUl4B3L72k")
+_DB_HOST = os.getenv("DB_HOST", "db-mysql-nyc3-02019-do-user-33079250-0.j.db.ondigitalocean.com")
+_DB_PORT = os.getenv("DB_PORT", "25060")
+_DB_NAME = os.getenv("DB_NAME", "defaultdb")
+
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
+    "DATABASE_URL",
+    f"mysql+mysqlconnector://{_DB_USER}:{_DB_PASS}@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}"
+    f"?ssl_ca={CA_CERT_PATH}",
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
-app.config["JWT_SECRET_KEY"] = "super-secure-uga-hacks-key"
+app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secure-uga-hacks-key")
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
@@ -135,6 +142,7 @@ DEFAULT_SETTINGS = {
     "nearbyDirectory": "farmersmarket",
     "currency": "USD",
     "timezone": "America/New_York",
+    "supplierLeadTimeDays": 3,
 }
 
 
@@ -2638,6 +2646,513 @@ def nearby_food_resources():
 
     except Exception as e:
         app.logger.exception("/sustainability/nearby-food-resources failed")
+        return jsonify({"error": str(e)}), 500
+
+
+# --- Stockout Prediction & Reorder Suggestions ---
+
+@app.route("/predict/stockouts", methods=["GET"])
+@jwt_required()
+def predict_stockouts():
+    """
+    Analyse current stock levels and recent consumption (audit log CONSUME
+    entries) to predict when each ingredient will run out, and suggest
+    reorder timing based on configurable supplier lead‑time.
+
+    Algorithm (per ingredient, per unit):
+      1. Gather CONSUME audit entries for the last 30 days.
+      2. Compute daily average usage rate.
+      3. Calculate current total stock from __STOCK__ batches.
+      4. days_until_stockout = current_stock / avg_daily_usage
+      5. Compare against supplier lead‑time to flag reorder urgency.
+
+    Returns a list sorted by urgency (lowest days‑until‑stockout first).
+    """
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        org_id = user.orgID
+        settings = get_org_settings(org_id)
+        lead_time_days = settings.get("supplierLeadTimeDays", 3)
+        low_stock_threshold = settings.get("lowStockThreshold", 2)
+
+        from datetime import timedelta
+        now = datetime.utcnow()
+        lookback = now - timedelta(days=30)
+        today = now.date()
+
+        # ---- 1. Gather recent consumption from audit_logs ----
+        consume_logs = AuditLog.query.filter(
+            AuditLog.orgID == org_id,
+            AuditLog.action == "CONSUME",
+            AuditLog.resource_type == "stock",
+            AuditLog.timestamp >= lookback,
+        ).all()
+
+        # Build per-ingredient daily usage from deduction details
+        # details JSON: {"dishName": ..., "quantity": N, "deductions_count": M}
+        # We also stored per-deduction info in /stock/consume response but the
+        # audit log stores the dish-level summary. We need to re-derive
+        # ingredient-level usage from consumption quantity × recipe ratios.
+
+        # Gather dish → recipe ingredient ratios
+        dish_recipes = {}  # dishID -> [{ingName, category, qty, unit}, ...]
+        all_dishes = Dish.query.filter(
+            Dish.orgID == org_id,
+            Dish.dishName != STOCK_DISH_NAME,
+        ).all()
+        dish_name_to_id = {d.dishName: d.dishID for d in all_dishes}
+
+        for dish in all_dishes:
+            recipe_rows = (
+                db.session.query(DishIngredient, Ingredient)
+                .join(Ingredient, Ingredient.ingID == DishIngredient.ingID)
+                .filter(
+                    DishIngredient.dishID == dish.dishID,
+                    Ingredient.expiry.is_(None),
+                    Ingredient.batchNum.is_(None),
+                )
+                .all()
+            )
+            dish_recipes[dish.dishID] = [
+                {
+                    "ingName": ing.ingName,
+                    "category": ing.category,
+                    "qty": float(link.qty) if link.qty else 0,
+                    "unit": link.unit or "",
+                }
+                for link, ing in recipe_rows
+            ]
+
+        # Accumulate per-ingredient usage over the 30-day window
+        # key = (ingName, category, unit) -> total_qty_consumed
+        usage_totals = {}
+        usage_daily_buckets = {}  # key -> set of dates with consumption
+        for log in consume_logs:
+            try:
+                details = json.loads(log.details) if log.details else {}
+            except (json.JSONDecodeError, TypeError):
+                continue
+            dish_name = details.get("dishName", "")
+            cooked_qty = Decimal(str(details.get("quantity", 0)))
+            dish_id = dish_name_to_id.get(dish_name)
+            if not dish_id or dish_id not in dish_recipes:
+                continue
+            log_date = log.timestamp.date()
+            for recipe_ing in dish_recipes[dish_id]:
+                key = (recipe_ing["ingName"], recipe_ing["category"], recipe_ing["unit"])
+                consumed = float(cooked_qty) * recipe_ing["qty"]
+                usage_totals[key] = usage_totals.get(key, 0) + consumed
+                if key not in usage_daily_buckets:
+                    usage_daily_buckets[key] = set()
+                usage_daily_buckets[key].add(log_date)
+
+        # ---- 2. Current stock levels ----
+        stock_dish = Dish.query.filter(
+            Dish.orgID == org_id,
+            Dish.dishName == STOCK_DISH_NAME,
+        ).first()
+
+        stock_levels = {}  # (ingName, category, unit) -> total qty
+        if stock_dish:
+            batch_rows = (
+                db.session.query(Ingredient, DishIngredient)
+                .join(DishIngredient, and_(
+                    DishIngredient.dishID == stock_dish.dishID,
+                    DishIngredient.ingID == Ingredient.ingID,
+                ))
+                .filter(
+                    Ingredient.orgID == org_id,
+                    or_(Ingredient.expiry.isnot(None), Ingredient.batchNum.isnot(None)),
+                )
+                .all()
+            )
+            for batch, link in batch_rows:
+                if link.qty is None:
+                    continue
+                key = (batch.ingName, batch.category, link.unit or "")
+                stock_levels[key] = stock_levels.get(key, 0) + float(link.qty)
+
+        # ---- 3. Compute predictions ----
+        days_in_window = max((today - lookback.date()).days, 1)
+        predictions = []
+        all_keys = set(list(usage_totals.keys()) + list(stock_levels.keys()))
+
+        for key in all_keys:
+            ing_name, category, unit = key
+            current_stock = stock_levels.get(key, 0)
+            total_used = usage_totals.get(key, 0)
+            active_days = len(usage_daily_buckets.get(key, set())) or days_in_window
+            # Use active days (days where consumption actually happened) for rate,
+            # but cap at window length
+            avg_daily = total_used / days_in_window if total_used > 0 else 0
+
+            if avg_daily > 0:
+                days_until_stockout = round(current_stock / avg_daily, 1)
+            else:
+                days_until_stockout = None  # No usage data, can't predict
+
+            # Reorder urgency
+            needs_reorder = False
+            reorder_urgency = "ok"
+            if days_until_stockout is not None:
+                if days_until_stockout <= 0:
+                    reorder_urgency = "out-of-stock"
+                    needs_reorder = True
+                elif days_until_stockout <= lead_time_days:
+                    reorder_urgency = "critical"
+                    needs_reorder = True
+                elif days_until_stockout <= lead_time_days + low_stock_threshold:
+                    reorder_urgency = "warning"
+                    needs_reorder = True
+
+            # Suggested reorder quantity: enough for lead_time + 7 buffer days
+            suggested_reorder_qty = None
+            if needs_reorder and avg_daily > 0:
+                buffer_days = lead_time_days + 7
+                suggested_reorder_qty = round(avg_daily * buffer_days - current_stock, 1)
+                if suggested_reorder_qty < 0:
+                    suggested_reorder_qty = 0
+
+            predictions.append({
+                "ingName": ing_name,
+                "category": category or "Uncategorized",
+                "unit": unit,
+                "currentStock": round(current_stock, 2),
+                "avgDailyUsage": round(avg_daily, 2),
+                "daysUntilStockout": days_until_stockout,
+                "reorderUrgency": reorder_urgency,
+                "needsReorder": needs_reorder,
+                "suggestedReorderQty": suggested_reorder_qty,
+                "supplierLeadTimeDays": lead_time_days,
+            })
+
+        # Sort: out-of-stock first, then critical, warning, ok. Within each, by days.
+        urgency_order = {"out-of-stock": 0, "critical": 1, "warning": 2, "ok": 3}
+        predictions.sort(key=lambda p: (
+            urgency_order.get(p["reorderUrgency"], 4),
+            p["daysUntilStockout"] if p["daysUntilStockout"] is not None else 9999,
+        ))
+
+        # Summary stats
+        health_score = 0
+        if predictions:
+            ok_count = sum(1 for p in predictions if p["reorderUrgency"] == "ok")
+            no_usage = sum(1 for p in predictions if p["daysUntilStockout"] is None)
+            health_score = round(((ok_count + no_usage) / len(predictions)) * 100)
+
+        return jsonify({
+            "predictions": predictions,
+            "summary": {
+                "totalIngredients": len(predictions),
+                "outOfStock": sum(1 for p in predictions if p["reorderUrgency"] == "out-of-stock"),
+                "critical": sum(1 for p in predictions if p["reorderUrgency"] == "critical"),
+                "warning": sum(1 for p in predictions if p["reorderUrgency"] == "warning"),
+                "healthy": sum(1 for p in predictions if p["reorderUrgency"] == "ok"),
+                "noUsageData": sum(1 for p in predictions if p["daysUntilStockout"] is None),
+                "healthScore": health_score,
+                "supplierLeadTimeDays": lead_time_days,
+            },
+        }), 200
+
+    except Exception as e:
+        app.logger.exception("/predict/stockouts failed")
+        return jsonify({"error": str(e)}), 500
+
+
+# --- Vendor Pricing / Order Comparison ---
+
+import random as _rnd
+import hashlib as _hl
+
+# Simulated vendor catalogue – deterministic per ingredient for consistency
+_VENDOR_POOL = [
+    {"name": "FreshDirect Wholesale", "rating": 4.7, "minOrder": 5,  "deliveryDays": 1, "sustainable": True},
+    {"name": "Sysco Foods",          "rating": 4.5, "minOrder": 10, "deliveryDays": 2, "sustainable": False},
+    {"name": "US Foods",             "rating": 4.4, "minOrder": 8,  "deliveryDays": 2, "sustainable": False},
+    {"name": "LocalHarvest Co-op",   "rating": 4.8, "minOrder": 3,  "deliveryDays": 1, "sustainable": True},
+    {"name": "Gordon Food Service",  "rating": 4.3, "minOrder": 12, "deliveryDays": 3, "sustainable": False},
+    {"name": "Farm2Table Direct",    "rating": 4.9, "minOrder": 2,  "deliveryDays": 1, "sustainable": True},
+]
+
+_UNIT_BASE_PRICES = {
+    "lb":    {"low": 1.20, "high": 6.50},
+    "oz":    {"low": 0.15, "high": 1.20},
+    "kg":    {"low": 2.50, "high": 14.0},
+    "g":     {"low": 0.01, "high": 0.10},
+    "gal":   {"low": 3.00, "high": 9.00},
+    "L":     {"low": 1.50, "high": 5.00},
+    "each":  {"low": 0.30, "high": 3.50},
+    "bunch": {"low": 1.00, "high": 4.00},
+    "dozen": {"low": 2.00, "high": 8.00},
+}
+
+
+def _seed_for(name: str) -> int:
+    return int(_hl.md5(name.encode()).hexdigest(), 16) % (10 ** 9)
+
+
+def _generate_vendors_for_ingredient(ing_name: str, unit: str, qty_needed: float):
+    """Return 3-4 deterministic simulated vendor offers for an ingredient."""
+    seed = _seed_for(ing_name)
+    rng = _rnd.Random(seed)
+
+    price_range = _UNIT_BASE_PRICES.get(unit, {"low": 0.50, "high": 5.00})
+    base_price = rng.uniform(price_range["low"], price_range["high"])
+
+    # Pick 3-4 vendors deterministically
+    vendor_count = rng.choice([3, 4])
+    chosen = rng.sample(_VENDOR_POOL, k=min(vendor_count, len(_VENDOR_POOL)))
+
+    offers = []
+    for v in chosen:
+        # Each vendor adjusts the base price by ±30 %
+        price_mult = rng.uniform(0.70, 1.30)
+        unit_price = round(base_price * price_mult, 2)
+        total = round(unit_price * max(qty_needed, v["minOrder"]), 2)
+        offers.append({
+            "vendorName": v["name"],
+            "rating": v["rating"],
+            "unitPrice": unit_price,
+            "unit": unit,
+            "minOrder": v["minOrder"],
+            "deliveryDays": v["deliveryDays"],
+            "sustainable": v["sustainable"],
+            "totalCost": total,
+            "qtyForTotal": max(qty_needed, v["minOrder"]),
+        })
+
+    # Sort cheapest first
+    offers.sort(key=lambda o: o["unitPrice"])
+    return offers
+
+
+@app.route("/vendors/pricing", methods=["GET"])
+@jwt_required()
+def vendors_pricing():
+    """
+    Return simulated vendor pricing for ingredients that need reorder.
+    Optionally filter to a single ingredient via ?ingredient=<name>.
+    Re-uses the same stock & consumption logic as /predict/stockouts.
+    """
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        org_id = user.orgID
+        filter_ingredient = request.args.get("ingredient", None)
+
+        settings = get_org_settings(org_id)
+        lead_time_days = settings.get("supplierLeadTimeDays", 3)
+        low_stock_threshold = settings.get("lowStockThreshold", 2)
+
+        from datetime import timedelta
+        now = datetime.now()
+        lookback = now - timedelta(days=30)
+        today = now.date()
+
+        # ---- Consumption from audit_logs (same as predict_stockouts) ----
+        consume_logs = AuditLog.query.filter(
+            AuditLog.orgID == org_id,
+            AuditLog.action == "CONSUME",
+            AuditLog.resource_type == "stock",
+            AuditLog.timestamp >= lookback,
+        ).all()
+
+        # Dish recipes
+        all_dishes = Dish.query.filter(
+            Dish.orgID == org_id,
+            Dish.dishName != STOCK_DISH_NAME,
+        ).all()
+        dish_name_to_id = {d.dishName: d.dishID for d in all_dishes}
+
+        dish_recipes = {}
+        for dish in all_dishes:
+            recipe_rows = (
+                db.session.query(DishIngredient, Ingredient)
+                .join(Ingredient, Ingredient.ingID == DishIngredient.ingID)
+                .filter(
+                    DishIngredient.dishID == dish.dishID,
+                    Ingredient.expiry.is_(None),
+                    Ingredient.batchNum.is_(None),
+                )
+                .all()
+            )
+            dish_recipes[dish.dishID] = [
+                {
+                    "ingName": ing.ingName,
+                    "category": ing.category,
+                    "qty": float(link.qty) if link.qty else 0,
+                    "unit": link.unit or "",
+                }
+                for link, ing in recipe_rows
+            ]
+
+        # Per-ingredient usage totals
+        usage_totals = {}
+        days_in_window = max((today - lookback.date()).days, 1)
+        for log in consume_logs:
+            try:
+                details = json.loads(log.details) if log.details else {}
+            except (json.JSONDecodeError, TypeError):
+                continue
+            dish_name = details.get("dishName", "")
+            cooked_qty = float(details.get("quantity", 0))
+            dish_id = dish_name_to_id.get(dish_name)
+            if not dish_id or dish_id not in dish_recipes:
+                continue
+            for recipe_ing in dish_recipes[dish_id]:
+                key = (recipe_ing["ingName"], recipe_ing["category"], recipe_ing["unit"])
+                usage_totals[key] = usage_totals.get(key, 0) + cooked_qty * recipe_ing["qty"]
+
+        # ---- Current stock levels ----
+        stock_dish = Dish.query.filter(
+            Dish.orgID == org_id,
+            Dish.dishName == STOCK_DISH_NAME,
+        ).first()
+
+        stock_levels = {}
+        if stock_dish:
+            batch_rows = (
+                db.session.query(Ingredient, DishIngredient)
+                .join(DishIngredient, and_(
+                    DishIngredient.dishID == stock_dish.dishID,
+                    DishIngredient.ingID == Ingredient.ingID,
+                ))
+                .filter(
+                    Ingredient.orgID == org_id,
+                    or_(Ingredient.expiry.isnot(None), Ingredient.batchNum.isnot(None)),
+                )
+                .all()
+            )
+            for batch, link in batch_rows:
+                if link.qty is None:
+                    continue
+                key = (batch.ingName, batch.category, link.unit or "")
+                stock_levels[key] = stock_levels.get(key, 0) + float(link.qty)
+
+        # ---- Build result items ----
+        all_keys = set(list(usage_totals.keys()) + list(stock_levels.keys()))
+        result_items = []
+
+        for key in all_keys:
+            ing_name, category, unit = key
+            if filter_ingredient and ing_name.lower() != filter_ingredient.lower():
+                continue
+
+            current_stock = stock_levels.get(key, 0)
+            total_used = usage_totals.get(key, 0)
+            avg_daily = round(total_used / days_in_window, 2) if total_used > 0 else 0.0
+
+            if avg_daily > 0:
+                days_left = round(current_stock / avg_daily, 1)
+            else:
+                days_left = None
+
+            if days_left is None:
+                urgency = "ok"
+            elif days_left <= 0:
+                urgency = "out-of-stock"
+            elif days_left <= lead_time_days:
+                urgency = "critical"
+            elif days_left <= lead_time_days + low_stock_threshold:
+                urgency = "warning"
+            else:
+                urgency = "ok"
+
+            needs_reorder = urgency in ("out-of-stock", "critical", "warning")
+            suggested_qty = round(avg_daily * (lead_time_days + 7) - current_stock, 1) if avg_daily > 0 and needs_reorder else 0
+            if suggested_qty < 0:
+                suggested_qty = 0
+
+            unit_for_vendor = unit or "each"
+            vendors = _generate_vendors_for_ingredient(ing_name, unit_for_vendor, suggested_qty)
+
+            # 7-day forecast
+            forecast = []
+            running = current_stock
+            for d in range(1, 8):
+                running = max(running - avg_daily, 0)
+                forecast.append({"day": d, "projectedStock": round(running, 1)})
+
+            result_items.append({
+                "ingID": 0,
+                "ingName": ing_name,
+                "category": category or "Uncategorized",
+                "unit": unit_for_vendor,
+                "currentStock": round(current_stock, 2),
+                "avgDailyUsage": avg_daily,
+                "daysUntilStockout": days_left,
+                "reorderUrgency": urgency,
+                "needsReorder": needs_reorder,
+                "suggestedQty": suggested_qty,
+                "vendors": vendors,
+                "forecast": forecast,
+            })
+
+        # Sort by urgency
+        urgency_order = {"out-of-stock": 0, "critical": 1, "warning": 2, "ok": 3}
+        result_items.sort(key=lambda x: (urgency_order.get(x["reorderUrgency"], 4),
+                                          x["daysUntilStockout"] if x["daysUntilStockout"] is not None else 9999))
+
+        return jsonify({"items": result_items, "supplierLeadTimeDays": lead_time_days}), 200
+
+    except Exception as e:
+        app.logger.exception("/vendors/pricing failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/vendors/order", methods=["POST"])
+@jwt_required()
+def vendors_place_order():
+    """
+    Simulated order placement. Records the order in audit logs.
+    Body: { "items": [{ "ingName": "...", "vendorName": "...", "qty": 10, "unit": "lb", "totalCost": 25.50 }] }
+    """
+    try:
+        user_id = int(get_jwt_identity())
+        user = db.session.get(User, user_id)
+        if not user:
+            return jsonify({"error": "User not found"}), 404
+
+        body = request.get_json(force=True)
+        items = body.get("items", [])
+        if not items:
+            return jsonify({"error": "No items provided"}), 400
+
+        total_cost = 0.0
+        order_details = []
+        for item in items:
+            cost = float(item.get("totalCost", 0))
+            total_cost += cost
+            order_details.append({
+                "ingredient": item.get("ingName"),
+                "vendor": item.get("vendorName"),
+                "qty": item.get("qty"),
+                "unit": item.get("unit"),
+                "cost": cost,
+            })
+
+        record_audit(
+            user_id=user_id,
+            org_id=user.orgID,
+            action="ORDER",
+            resource_type="ingredient",
+            resource_id=None,
+            details=json.dumps({"orderItems": order_details, "totalCost": round(total_cost, 2)}),
+        )
+
+        return jsonify({
+            "message": f"Order placed successfully for {len(items)} item(s)",
+            "totalCost": round(total_cost, 2),
+            "itemCount": len(items),
+        }), 201
+
+    except Exception as e:
+        app.logger.exception("/vendors/order failed")
         return jsonify({"error": str(e)}), 500
 
 

@@ -30,7 +30,6 @@ type ModalType =
 	| 'edit-ingredient'
 	| 'delete-dish'
 	| 'delete-ingredient'
-	| 'view-dish'
 	| null;
 
 type IngredientOption = {
@@ -207,8 +206,8 @@ export default function Inventory() {
 		if (type === 'dish' || type === 'edit-dish') {
 			loadAvailableIngredients();
 		}
-		if ((type === 'edit-dish' || type === 'view-dish') && row) {
-			loadDishDetail(row.id, type === 'edit-dish');
+		if (type === 'edit-dish' && row) {
+			loadDishDetail(row.id, true);
 		}
 	};
 
@@ -538,13 +537,9 @@ export default function Inventory() {
 									<FoodThumbnail name={row.name} size={36} type={activeTab === 'dishes' ? 'meal' : 'ingredient'} />
 								</View>
 								<View style={[styles.tableCell, styles.cellName]}>
-									{activeTab === 'dishes' ? (
-										<TouchableOpacity onPress={() => openModal('view-dish', { id: row.id, name: row.name })}>
-											<Text style={styles.cellPrimaryLink}>{row.name}</Text>
-										</TouchableOpacity>
-									) : (
-										<Text style={styles.cellPrimary}>{row.name}</Text>
-									)}
+									<TouchableOpacity onPress={() => handleEditRow({ id: row.id, name: row.name, category: activeTab === 'ingredients' ? (row as IngredientRow).category : undefined })}>
+										<Text style={styles.cellPrimaryLink}>{row.name}</Text>
+									</TouchableOpacity>
 								</View>
 								{activeTab === 'ingredients' && (
 									<>
@@ -657,6 +652,7 @@ export default function Inventory() {
 							</TouchableOpacity>
 						</View>
 
+					<ScrollView style={styles.modalScroll} showsVerticalScrollIndicator={true}>
 						{(modalType === 'ingredient' || modalType === 'edit-ingredient') && (
 							<View style={styles.modalBody}>
 								<Text style={styles.modalLabel}>Ingredient name</Text>
@@ -750,42 +746,14 @@ export default function Inventory() {
 							</View>
 						)}
 
-						{modalType === 'view-dish' && (
-							<View style={styles.modalBody}>
-								<Text style={styles.modalLabel}>Ingredients</Text>
-								{dishDetailLoading ? (
-									<Text style={styles.cellSecondary}>Loading...</Text>
-								) : dishIngredients.length === 0 ? (
-									<Text style={styles.cellSecondary}>No ingredients linked yet.</Text>
-								) : (
-									<View style={styles.dishDetailList}>
-										{dishIngredients.map((ingredient) => (
-											<View key={ingredient.ingID} style={styles.dishDetailRow}>
-												<View style={styles.dishDetailInfo}>
-													<Text style={styles.dishDetailName}>{ingredient.ingName}</Text>
-													<Text style={styles.dishDetailMeta}>
-														{ingredient.category || 'Uncategorized'}
-													</Text>
-												</View>
-												<Text style={styles.dishDetailQty}>
-													{ingredient.qty ?? '-'} {ingredient.unit || ''}
-												</Text>
-											</View>
-										))}
-									</View>
-								)}
-							</View>
-						)}
-
 						{modalError && <Text style={styles.modalError}>{modalError}</Text>}
+					</ScrollView>
 
 						<View style={styles.modalActions}>
 							<TouchableOpacity style={styles.secondaryButton} onPress={closeModal} disabled={isSaving}>
-								<Text style={styles.secondaryButtonText}>
-									{modalType === 'view-dish' ? 'Close' : 'Cancel'}
-								</Text>
+								<Text style={styles.secondaryButtonText}>Cancel</Text>
 							</TouchableOpacity>
-							{modalType === 'view-dish' ? null : (modalType === 'delete-dish' || modalType === 'delete-ingredient') ? (
+							{(modalType === 'delete-dish' || modalType === 'delete-ingredient') ? (
 								<TouchableOpacity style={styles.deleteButton} onPress={handleConfirmDelete} disabled={isSaving}>
 									<Text style={styles.deleteButtonText}>{isSaving ? 'Deleting...' : 'Delete'}</Text>
 								</TouchableOpacity>
@@ -1063,10 +1031,14 @@ const styles = StyleSheet.create({
 	modalCard: {
 		width: '100%',
 		maxWidth: 520,
+		maxHeight: '85%',
 		backgroundColor: Colors.landing.white,
 		borderRadius: 10,
 		padding: 20,
 		gap: 16,
+	},
+	modalScroll: {
+		flexGrow: 0,
 	},
 	modalHeader: {
 		flexDirection: 'row',

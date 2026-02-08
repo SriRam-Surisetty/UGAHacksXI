@@ -17,6 +17,7 @@ import {
 import { Colors } from '@/constants/theme';
 import Markdown from 'react-native-markdown-display';
 import { Ionicons } from '@expo/vector-icons';
+import api from '@/services/api';
 
 // Cast components to any for TS compatibility
 const TextInput = NativeTextInput as any;
@@ -146,18 +147,11 @@ export default function Chatbot() {
         setIsLoading(true);
 
         try {
-            // Use local IP address for physical device testing
-            const response = await fetch('http://172.21.218.223:5001/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: userMessage.text }),
+            const response = await api.post('/chat', {
+                message: userMessage.text,
             });
 
-            const data = await response.json();
-
-            if (!response.ok) {
-                throw new Error(data.error || 'Failed to get response');
-            }
+            const data = response.data;
 
             const botMessage: Message = {
                 id: (Date.now() + 1).toString(),

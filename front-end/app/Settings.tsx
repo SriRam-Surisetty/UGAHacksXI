@@ -38,6 +38,7 @@ type SettingsData = {
     nearbyDirectory: string;
     currency: string;
     timezone: string;
+    supplierLeadTimeDays: number;
 };
 
 const DIRECTORY_OPTIONS = [
@@ -87,6 +88,7 @@ export default function Settings() {
     const [lowStockThreshold, setLowStockThreshold] = useState('2');
     const [sustainabilityRecipeDays, setSustainabilityRecipeDays] = useState('5');
     const [nearbySearchRadius, setNearbySearchRadius] = useState('30');
+    const [supplierLeadTimeDays, setSupplierLeadTimeDays] = useState('3');
     const [nearbyDirectory, setNearbyDirectory] = useState('farmersmarket');
     const [currency, setCurrency] = useState('USD');
     const [timezone, setTimezone] = useState('America/New_York');
@@ -151,6 +153,7 @@ export default function Settings() {
             setLowStockThreshold(String(s.lowStockThreshold));
             setSustainabilityRecipeDays(String(s.sustainabilityRecipeDays));
             setNearbySearchRadius(String(s.nearbySearchRadius));
+            setSupplierLeadTimeDays(String(s.supplierLeadTimeDays ?? 3));
             setNearbyDirectory(s.nearbyDirectory || 'farmersmarket');
             setCurrency(s.currency || 'USD');
             setTimezone(s.timezone || 'America/New_York');
@@ -208,6 +211,7 @@ export default function Settings() {
                 lowStockThreshold: parseInt(lowStockThreshold, 10) || 2,
                 sustainabilityRecipeDays: parseInt(sustainabilityRecipeDays, 10) || 5,
                 nearbySearchRadius: parseInt(nearbySearchRadius, 10) || 30,
+                supplierLeadTimeDays: parseInt(supplierLeadTimeDays, 10) || 3,
                 nearbyDirectory,
                 currency,
                 timezone,
@@ -430,6 +434,23 @@ export default function Settings() {
                                         placeholder="5"
                                     />
                                 </View>
+                            </View>
+
+                            <View style={styles.formRow}>
+                                <View style={[styles.formGroup, styles.flex1]}>
+                                    <Text style={styles.label}>Supplier Lead Time (days)</Text>
+                                    <Text style={styles.hintText}>
+                                        Average days between ordering and delivery. Used for reorder predictions.
+                                    </Text>
+                                    <TextInput
+                                        style={styles.input}
+                                        value={supplierLeadTimeDays}
+                                        onChangeText={setSupplierLeadTimeDays}
+                                        keyboardType="numeric"
+                                        placeholder="3"
+                                    />
+                                </View>
+                                <View style={[styles.formGroup, styles.flex1]} />
                             </View>
                         </View>
 

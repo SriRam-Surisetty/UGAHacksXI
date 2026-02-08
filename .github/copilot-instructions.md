@@ -15,7 +15,7 @@
 ## External Services & Environment
 - MySQL is hosted on DigitalOcean with SSL; the API expects `back-end/certs/ca-certificate.crt` (see `SQLALCHEMY_DATABASE_URI` in `back-end/app.py`).
 - CORS is restricted to `http://localhost:8081` in `back-end/app.py`.
-- Chat requests in the UI are currently hardcoded to `http://172.21.218.223:5001/chat` in `front-end/components/ChatWidget.tsx` (not using the shared Axios base URL).
+- Both chat interfaces (`ChatWidget.tsx` and `(tabs)/chatbot.tsx`) now use the shared `api` client from `front-end/services/api.ts`.
 - Android emulator base URL is `http://10.0.2.2:5001`, while web/iOS use `http://localhost:5001` (`front-end/services/api.ts`).
 
 ## Developer Workflows
@@ -35,7 +35,12 @@
   - `GET /inventory/ingredients`
   - `GET /inventory/dishes/<id>`
   - `POST /inventory/ingredient-types`
+- Vendor pricing / order endpoints:
+  - `GET /vendors/pricing` — simulated multi-vendor price comparisons per ingredient, with 7-day stock forecast.
+  - `POST /vendors/order` — place a simulated order (recorded in audit logs as `ORDER` action).
+- The Order page (`front-end/app/Order.tsx`) shows priority levels (P0–P3), vendor comparison cards, 7-day sparkline forecasts, and a sticky order bar.
+- Dashboard reorder suggestions link to the Order page via `?ingredient=<name>&urgency=<level>`.
 - The Gemini chatbot endpoint is `POST /chat` with `{ "message": "..." }`.
-- Audit logging: every mutating action (create, update, delete, login, import, export, consume, chat) is recorded in the `audit_logs` table via `record_audit()`.
+- Audit logging: every mutating action (create, update, delete, login, import, export, consume, chat, order) is recorded in the `audit_logs` table via `record_audit()`.
   - `GET /audit-logs` returns paginated audit logs (admin only). Supports `?action=`, `?resource_type=`, `?page=`, `?per_page=` query params.
   - The Audit Logs UI is at `front-end/app/AuditLogs.tsx` (admin only, linked from the nav header).

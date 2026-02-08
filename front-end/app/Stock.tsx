@@ -502,7 +502,9 @@ export default function Stock() {
                                         <FoodThumbnail name={batch.name} size={36} type="ingredient" />
                                     </View>
                                     <View style={[styles.tableCell, styles.cellName]}>
-                                        <Text style={styles.cellPrimary}>{batch.name}</Text>
+                                        <TouchableOpacity onPress={() => openModal('edit', batch)}>
+                                            <Text style={styles.cellPrimaryLink}>{batch.name}</Text>
+                                        </TouchableOpacity>
                                     </View>
                                     <View style={[styles.tableCell, styles.cellCategory]}>
                                         <Text style={styles.cellSecondary}>{batch.category || '-'}</Text>
@@ -611,6 +613,7 @@ export default function Stock() {
                             {modalType === 'add' && 'Add Batch'}
                             {modalType === 'consume' && 'Log Cooked Dish'}
                         </Text>
+                        <ScrollView style={styles.modalScroll}>
                         {modalType === 'edit' && selectedBatch && (
                             <View style={styles.modalBody}>
                                 <Text style={styles.modalLabel}>Batch</Text>
@@ -746,6 +749,7 @@ export default function Stock() {
                         )}
 
                         {modalError && <Text style={styles.modalError}>{modalError}</Text>}
+                        </ScrollView>
 
                         <View style={styles.modalActions}>
                             <TouchableOpacity style={styles.primaryButton} onPress={handleConfirm}>
@@ -990,6 +994,12 @@ const styles = StyleSheet.create({
         fontWeight: '600',
         color: '#111827',
     },
+    cellPrimaryLink: {
+        fontSize: 13,
+        fontWeight: '600',
+        color: Colors.landing.primaryPurple,
+        textDecorationLine: 'underline',
+    },
     cellSecondary: {
         fontSize: 12,
         color: '#6b7280',
@@ -1040,9 +1050,13 @@ const styles = StyleSheet.create({
     modalCard: {
         width: '100%',
         maxWidth: 420,
+        maxHeight: '85%',
         backgroundColor: Colors.landing.white,
         borderRadius: 10,
         padding: 20,
+    },
+    modalScroll: {
+        flexGrow: 0,
     },
     modalTitle: {
         fontSize: 18,

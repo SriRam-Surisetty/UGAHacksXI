@@ -20,6 +20,7 @@ const mainNavItems = [
     { label: 'Dashboard', route: '/Dashboard' },
     { label: 'Stock', route: '/Stock' },
     { label: 'Inventory', route: '/Inventory' },
+    { label: 'Order', route: '/Order' },
     { label: 'Sustainability', route: '/Sustainability' },
     { label: 'Support', route: '/Support' },
 ];

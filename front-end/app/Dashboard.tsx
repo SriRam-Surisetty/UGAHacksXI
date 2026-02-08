@@ -1,12 +1,13 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import { ActivityIndicator, Dimensions, Platform, SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { Link } from 'expo-router';
+import { Link, useRouter } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
 import FloatingChatButton from '@/components/FloatingChatButton';
 import { Ionicons } from '@expo/vector-icons';
 import api from '@/services/api';
+import Svg, { Circle } from 'react-native-svg';
 
 const { width } = Dimensions.get('window');
 
@@ -36,6 +37,35 @@ type DashboardData = {
 	categories: Record<string, number>;
 };
 
+type Prediction = {
+	ingName: string;
+	category: string;
+	unit: string;
+	currentStock: number;
+	avgDailyUsage: number;
+	daysUntilStockout: number | null;
+	reorderUrgency: 'out-of-stock' | 'critical' | 'warning' | 'ok';
+	needsReorder: boolean;
+	suggestedReorderQty: number | null;
+	supplierLeadTimeDays: number;
+};
+
+type PredictionSummary = {
+	totalIngredients: number;
+	outOfStock: number;
+	critical: number;
+	warning: number;
+	healthy: number;
+	noUsageData: number;
+	healthScore: number;
+	supplierLeadTimeDays: number;
+};
+
+type PredictionData = {
+	predictions: Prediction[];
+	summary: PredictionSummary;
+};
+
 function getTimeLeft(expiryStr: string): string {
 	const now = new Date();
 	const exp = new Date(expiryStr);
@@ -57,11 +87,55 @@ function getBadgeStyle(expiryStr: string) {
 	return { bg: styles.badgeWarning, text: styles.badgeTextWarning };
 }
 
+/* ---------- Radial Gauge ---------- */
+function RadialGauge({ score, size = 110, strokeWidth = 10 }: { score: number; size?: number; strokeWidth?: number }) {
+	const radius = (size - strokeWidth) / 2;
+	const circumference = 2 * Math.PI * radius;
+	const progress = Math.max(0, Math.min(100, score));
+	const strokeDashoffset = circumference - (progress / 100) * circumference;
+	const color = score >= 75 ? '#22c55e' : score >= 50 ? '#f59e0b' : '#c81d25';
+
+	return (
+		<View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
+			<Svg width={size} height={size} style={{ transform: [{ rotate: '-90deg' }] }}>
+				{/* Background track */}
+				<Circle
+					cx={size / 2}
+					cy={size / 2}
+					r={radius}
+					stroke="rgba(255,255,255,0.2)"
+					strokeWidth={strokeWidth}
+					fill="none"
+				/>
+				{/* Progress arc */}
+				<Circle
+					cx={size / 2}
+					cy={size / 2}
+					r={radius}
+					stroke={color}
+					strokeWidth={strokeWidth}
+					fill="none"
+					strokeDasharray={`${circumference}`}
+					strokeDashoffset={strokeDashoffset}
+					strokeLinecap="round"
+				/>
+			</Svg>
+			{/* Centered label */}
+			<View style={{ position: 'absolute', alignItems: 'center' }}>
+				<Text style={styles.gaugeValue}>{score}</Text>
+				<Text style={styles.gaugeLabel}>/100</Text>
+			</View>
+		</View>
+	);
+}
+
 export default function Dashboard() {
 	const isWide = width >= 900;
 	const isMid = width >= 720;
+	const router = useRouter();
 
 	const [data, setData] = useState<DashboardData | null>(null);
+	const [predictions, setPredictions] = useState<PredictionData | null>(null);
 	const [loading, setLoading] = useState(true);
 	const [error, setError] = useState<string | null>(null);
 
@@ -78,8 +152,12 @@ export default function Dashboard() {
 		setLoading(true);
 		setError(null);
 		try {
-			const res = await api.get('/dashboard');
-			setData(res.data);
+			const [dashRes, predRes] = await Promise.all([
+				api.get('/dashboard'),
+				api.get('/predict/stockouts').catch(() => null),
+			]);
+			setData(dashRes.data);
+			if (predRes) setPredictions(predRes.data);
 		} catch (err: any) {
 			setError(err?.response?.data?.error || 'Failed to load dashboard');
 		} finally {
@@ -287,6 +365,128 @@ export default function Dashboard() {
 						</View>
 					</View>
 
+					{/* Inventory Health Score & Stockout Predictions */}
+					{predictions && predictions.predictions.length > 0 && (
+						<View style={[styles.predictionSection, isMid && styles.predictionSectionWide]}>
+							{/* Reorder Suggestions – takes majority of space */}
+							<View style={[styles.cardShell, { flex: 3 }]}>
+								<View style={styles.cardHeader}>
+									<View style={styles.cardHeaderLeft}>
+										<Ionicons name="cart-outline" size={16} color={Colors.landing.primaryPurple} />
+										<Text style={styles.cardHeaderTitle}>Reorder Suggestions</Text>
+									</View>
+									<View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+										<View style={styles.leadTimeBadge}>
+											<Ionicons name="time-outline" size={10} color="#6b3fa0" />
+											<Text style={styles.leadTimeText}>
+												{predictions.summary.supplierLeadTimeDays}d lead time
+											</Text>
+										</View>
+										<TouchableOpacity
+											style={styles.viewAllOrderBtn}
+											onPress={() => router.push('/Order')}
+										>
+											<Text style={styles.viewAllOrderText}>Order Page</Text>
+											<Ionicons name="arrow-forward" size={12} color={Colors.landing.primaryPurple} />
+										</TouchableOpacity>
+									</View>
+								</View>
+								<View style={styles.cardBody}>
+									{predictions.predictions.filter(p => p.needsReorder).length === 0 ? (
+										<View style={styles.emptyState}>
+											<Ionicons name="checkmark-circle-outline" size={28} color="#22c55e" />
+											<Text style={styles.emptyStateText}>All stock levels are healthy — no reorders needed!</Text>
+										</View>
+									) : (
+										predictions.predictions.filter(p => p.needsReorder).slice(0, 6).map((pred, idx) => (
+											<React.Fragment key={`${pred.ingName}-${pred.unit}`}>
+												{idx > 0 && <View style={styles.divider} />}
+												<TouchableOpacity
+													style={styles.predRow}
+													activeOpacity={0.7}
+													onPress={() => router.push(`/Order?ingredient=${encodeURIComponent(pred.ingName)}&urgency=${pred.reorderUrgency}`)}
+												>
+													<View style={{ flex: 1 }}>
+														<View style={styles.predTitleRow}>
+															<Text style={styles.itemTitle}>{pred.ingName}</Text>
+															<View style={[styles.urgencyBadge,
+																pred.reorderUrgency === 'out-of-stock' ? styles.urgencyOOS
+																	: pred.reorderUrgency === 'critical' ? styles.urgencyCritical
+																		: styles.urgencyWarning
+															]}>
+																<Text style={[styles.urgencyText,
+																	pred.reorderUrgency === 'out-of-stock' ? styles.urgencyTextOOS
+																		: pred.reorderUrgency === 'critical' ? styles.urgencyTextCritical
+																			: styles.urgencyTextWarning
+																]}>
+																	{pred.reorderUrgency === 'out-of-stock' ? 'OUT'
+																		: pred.reorderUrgency === 'critical' ? 'CRITICAL' : 'LOW'}
+																</Text>
+															</View>
+														</View>
+														<Text style={styles.itemMeta}>
+															{pred.currentStock} {pred.unit} remaining • {pred.avgDailyUsage} {pred.unit}/day
+														</Text>
+														{pred.daysUntilStockout !== null && pred.daysUntilStockout > 0 && (
+															<Text style={styles.predDays}>
+																~{pred.daysUntilStockout} days until stockout
+															</Text>
+														)}
+													</View>
+													{pred.suggestedReorderQty != null && pred.suggestedReorderQty > 0 && (
+														<View style={styles.reorderQty}>
+															<Text style={styles.reorderQtyLabel}>Order</Text>
+															<Text style={styles.reorderQtyValue}>
+																{pred.suggestedReorderQty}
+															</Text>
+															<Text style={styles.reorderQtyUnit}>{pred.unit}</Text>
+														</View>
+													)}
+													<Ionicons name="chevron-forward" size={16} color="#d1d5db" style={{ marginLeft: 4 }} />
+												</TouchableOpacity>
+											</React.Fragment>
+										))
+									)}
+								</View>
+							</View>
+
+							{/* Health Score Radial – compact side card */}
+							<View style={[styles.healthScoreCard, isMid && { maxWidth: 200 }]}>
+								<View style={styles.healthScoreHeader}>
+									<Ionicons name="pulse-outline" size={16} color="#fff" />
+									<Text style={styles.healthScoreTitle}>Health Score</Text>
+								</View>
+								<View style={styles.healthGaugeCenter}>
+									<RadialGauge score={predictions.summary.healthScore} />
+								</View>
+								<View style={styles.healthScoreBreakdown}>
+									{predictions.summary.outOfStock > 0 && (
+										<View style={styles.healthScorePill}>
+											<View style={[styles.pillDot, { backgroundColor: '#c81d25' }]} />
+											<Text style={styles.pillText}>{predictions.summary.outOfStock} out</Text>
+										</View>
+									)}
+									{predictions.summary.critical > 0 && (
+										<View style={styles.healthScorePill}>
+											<View style={[styles.pillDot, { backgroundColor: '#f59e0b' }]} />
+											<Text style={styles.pillText}>{predictions.summary.critical} critical</Text>
+										</View>
+									)}
+									{predictions.summary.warning > 0 && (
+										<View style={styles.healthScorePill}>
+											<View style={[styles.pillDot, { backgroundColor: '#fb923c' }]} />
+											<Text style={styles.pillText}>{predictions.summary.warning} warning</Text>
+										</View>
+									)}
+									<View style={styles.healthScorePill}>
+										<View style={[styles.pillDot, { backgroundColor: '#22c55e' }]} />
+										<Text style={styles.pillText}>{predictions.summary.healthy} healthy</Text>
+									</View>
+								</View>
+							</View>
+						</View>
+					)}
+
 					{/* Secondary row */}
 					<View style={[styles.secondaryGrid, isWide && styles.secondaryGridWide]}>
 						{/* Categories breakdown */}
@@ -329,29 +529,8 @@ export default function Dashboard() {
 							</View>
 						</View>
 
-						{/* Sidebar: quick stats + actions */}
+						{/* Sidebar: quick actions */}
 						<View style={styles.sidebar}>
-							<View style={styles.cardShell}>
-								<View style={styles.centeredBlock}>
-									<Text style={styles.metricLabel}>Total Stock Batches</Text>
-									<Text style={styles.metricValue}>{counts.batches}</Text>
-									<View style={styles.progressTrack}>
-										<View
-											style={[
-												styles.progressFill,
-												{ width: counts.batches > 0 ? `${Math.round((counts.healthy / counts.batches) * 100)}%` : '0%' },
-											]}
-										/>
-									</View>
-									<Text style={styles.metricHint}>
-										{counts.healthy} of {counts.batches} batches are in healthy condition.
-									</Text>
-									<Link href="/Inventory" style={styles.purpleButton}>
-										<Text style={styles.purpleButtonText}>Manage Inventory</Text>
-									</Link>
-								</View>
-							</View>
-
 							<View style={styles.statusCard}>
 								<Text style={styles.statusTitle}>Quick Actions</Text>
 								<Link href="/Stock">
@@ -799,5 +978,191 @@ const styles = StyleSheet.create({
 		fontSize: 12,
 		color: Colors.landing.primaryPurple,
 		fontWeight: '600',
+	},
+	// Prediction / Reorder section
+	predictionSection: {
+		gap: 16,
+		marginBottom: 20,
+	},
+	predictionSectionWide: {
+		flexDirection: 'row',
+	},
+	healthScoreCard: {
+		flex: 1,
+		backgroundColor: Colors.landing.primaryPurple,
+		borderRadius: 12,
+		padding: 20,
+		gap: 12,
+		alignItems: 'center',
+	},
+	healthScoreHeader: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		alignSelf: 'flex-start',
+	},
+	healthScoreTitle: {
+		...fontBold,
+		fontSize: 10,
+		fontWeight: '800',
+		textTransform: 'uppercase',
+		letterSpacing: 1.4,
+		color: 'rgba(255,255,255,0.85)',
+	},
+	healthGaugeCenter: {
+		alignItems: 'center',
+		justifyContent: 'center',
+		paddingVertical: 4,
+	},
+	gaugeValue: {
+		...fontGroteskBold,
+		fontSize: 28,
+		fontWeight: '700',
+		color: '#fff',
+	},
+	gaugeLabel: {
+		...fontSemiBold,
+		fontSize: 11,
+		fontWeight: '600',
+		color: 'rgba(255,255,255,0.5)',
+		marginTop: -2,
+	},
+	healthScoreBreakdown: {
+		flexDirection: 'row',
+		flexWrap: 'wrap',
+		gap: 8,
+		marginTop: 4,
+	},
+	healthScorePill: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 5,
+		backgroundColor: 'rgba(255,255,255,0.15)',
+		paddingHorizontal: 10,
+		paddingVertical: 4,
+		borderRadius: 999,
+	},
+	pillDot: {
+		width: 7,
+		height: 7,
+		borderRadius: 4,
+	},
+	pillText: {
+		...fontSemiBold,
+		fontSize: 10,
+		fontWeight: '600',
+		color: '#fff',
+	},
+	leadTimeBadge: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+		backgroundColor: Colors.landing.lightPurple,
+		paddingHorizontal: 8,
+		paddingVertical: 3,
+		borderRadius: 999,
+	},
+	leadTimeText: {
+		...fontSemiBold,
+		fontSize: 9,
+		fontWeight: '600',
+		color: '#6b3fa0',
+		textTransform: 'uppercase',
+		letterSpacing: 0.6,
+	},
+	predRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		justifyContent: 'space-between',
+		gap: 12,
+	},
+	predTitleRow: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 8,
+		marginBottom: 4,
+	},
+	urgencyBadge: {
+		paddingHorizontal: 8,
+		paddingVertical: 2,
+		borderRadius: 999,
+		borderWidth: 1,
+	},
+	urgencyOOS: {
+		backgroundColor: '#fdecec',
+		borderColor: '#f5c2c7',
+	},
+	urgencyCritical: {
+		backgroundColor: '#fff3df',
+		borderColor: '#f5d3a9',
+	},
+	urgencyWarning: {
+		backgroundColor: '#fff8ed',
+		borderColor: '#fde5b1',
+	},
+	urgencyText: {
+		...fontBold,
+		fontSize: 8,
+		fontWeight: '900',
+		textTransform: 'uppercase',
+		letterSpacing: 0.8,
+	},
+	urgencyTextOOS: {
+		color: '#b42318',
+	},
+	urgencyTextCritical: {
+		color: '#b45309',
+	},
+	urgencyTextWarning: {
+		color: '#c2780a',
+	},
+	predDays: {
+		...fontMedium,
+		fontSize: 10,
+		color: '#b45309',
+		fontWeight: '500',
+		marginTop: 2,
+	},
+	reorderQty: {
+		alignItems: 'center',
+		backgroundColor: Colors.landing.lightPurple,
+		borderRadius: 10,
+		paddingHorizontal: 14,
+		paddingVertical: 8,
+		minWidth: 64,
+	},
+	reorderQtyLabel: {
+		...fontSemiBold,
+		fontSize: 8,
+		fontWeight: '600',
+		textTransform: 'uppercase',
+		letterSpacing: 1,
+		color: '#6b3fa0',
+		marginBottom: 2,
+	},
+	reorderQtyValue: {
+		...fontGroteskBold,
+		fontSize: 20,
+		fontWeight: '700',
+		color: Colors.landing.primaryPurple,
+	},
+	reorderQtyUnit: {
+		...fontMedium,
+		fontSize: 9,
+		color: '#6b3fa0',
+	},
+	viewAllOrderBtn: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
+	},
+	viewAllOrderText: {
+		...fontBold,
+		fontSize: 10,
+		fontWeight: '700',
+		textTransform: 'uppercase',
+		letterSpacing: 1.2,
+		color: Colors.landing.primaryPurple,
+		textDecorationLine: 'underline',
 	},
 });

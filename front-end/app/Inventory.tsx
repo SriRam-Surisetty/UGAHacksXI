@@ -10,9 +10,6 @@ import api from '@/services/api';
 type DishRow = {
 	id: number;
 	name: string;
-	category: string;
-	popularity: string;
-	lastUpdated: string;
 };
 
 type IngredientRow = {
@@ -124,9 +121,6 @@ export default function Inventory() {
 						dishes.map((dish: { dishID: number; dishName?: string }) => ({
 							id: dish.dishID,
 							name: dish.dishName || '-',
-							category: '-',
-							popularity: '-',
-							lastUpdated: '-',
 						}))
 					);
 				} else {
@@ -174,7 +168,7 @@ export default function Inventory() {
 	}, [ingredientsData]);
 
 	const tableHeaders = activeTab === 'dishes'
-		? ['Dish Name', 'Category', 'Popularity (Monthly)', 'Last Modified']
+		? ['Dish Name']
 		: ['Ingredient Name', 'Category', 'Linked Dishes'];
 
 	const addLabel = activeTab === 'dishes' ? 'Add Dish' : 'Add Ingredient';
@@ -479,39 +473,34 @@ export default function Inventory() {
 							<View key={row.id} style={styles.tableRow}>
 								<View style={[styles.tableCell, styles.cellName]}>
 									{activeTab === 'dishes' ? (
-										<TouchableOpacity onPress={() => openModal('view-dish', { id: row.id, name: row.name, category: row.category })}>
+										<TouchableOpacity onPress={() => openModal('view-dish', { id: row.id, name: row.name })}>
 											<Text style={styles.cellPrimaryLink}>{row.name}</Text>
 										</TouchableOpacity>
 									) : (
 										<Text style={styles.cellPrimary}>{row.name}</Text>
 									)}
 								</View>
-								<View style={[styles.tableCell, styles.cellCategory]}>
-									<Text style={styles.cellSecondary}>{row.category}</Text>
-								</View>
-								<View style={[styles.tableCell, styles.cellMetric]}>
-									{activeTab === 'dishes' ? (
-										<Text style={styles.cellMetricText}>{(row as DishRow).popularity}</Text>
-									) : (
-										<Text style={styles.cellMetricText}>{(row as IngredientRow).linkedDishes}</Text>
-									)}
-								</View>
-								{activeTab === 'dishes' && (
-									<View style={[styles.tableCell, styles.cellMetric]}>
-										<Text style={styles.cellSecondary}>{(row as DishRow).lastUpdated}</Text>
-									</View>
+								{activeTab === 'ingredients' && (
+									<>
+										<View style={[styles.tableCell, styles.cellCategory]}>
+											<Text style={styles.cellSecondary}>{(row as IngredientRow).category}</Text>
+										</View>
+										<View style={[styles.tableCell, styles.cellMetric]}>
+											<Text style={styles.cellMetricText}>{(row as IngredientRow).linkedDishes}</Text>
+										</View>
+									</>
 								)}
 								<View style={[styles.tableCell, styles.cellActions]}>
 									<View style={styles.actionRow}>
 										<TouchableOpacity
 											style={styles.iconButton}
-											onPress={() => handleEditRow({ id: row.id, name: row.name, category: row.category })}
+											onPress={() => handleEditRow({ id: row.id, name: row.name, category: activeTab === 'ingredients' ? (row as IngredientRow).category : undefined })}
 										>
 											<Ionicons name="pencil" size={14} color="#2563eb" />
 										</TouchableOpacity>
 										<TouchableOpacity
 											style={styles.iconButton}
-											onPress={() => handleDeleteRow({ id: row.id, name: row.name, category: row.category })}
+											onPress={() => handleDeleteRow({ id: row.id, name: row.name, category: activeTab === 'ingredients' ? (row as IngredientRow).category : undefined })}
 										>
 											<Ionicons name="trash" size={14} color="#dc2626" />
 										</TouchableOpacity>

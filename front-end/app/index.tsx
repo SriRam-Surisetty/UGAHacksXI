@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Link } from 'expo-router';
-import api from '../services/api';
 
 // Helper to render HTML content safely (for bot messages with links)
 const SafeHTML = ({ html }: { html: string }) => {
@@ -28,32 +27,27 @@ const LandingPage = () => {
     setMessages(prev => [...prev, { text, isUser }]);
   };
 
-  const getBotResponse = async (userMessage: string) => {
-    try {
-      // Add typing indicator
-      addMessage('...', false);
-      
-      // Make API call to backend
-      const response = await api.post('/chatbot', {
-        message: userMessage
-      });
-      
-      // Remove typing indicator
-      setMessages(prev => prev.slice(0, -1));
-      
-      // Add actual response
-      if (response.data && response.data.response) {
-        addMessage(response.data.response, false);
-      } else {
-        addMessage('Sorry, I\'m having trouble responding right now. Please try again! 😊', false);
-      }
-    } catch (error) {
-      console.error('Chatbot API error:', error);
-      // Remove typing indicator
-      setMessages(prev => prev.slice(0, -1));
-      // Fallback response
-      addMessage('Sorry, I\'m having trouble connecting. Please try again later! 😊', false);
+  const getBotResponse = (userMessage: string) => {
+    const lowerMessage = userMessage.toLowerCase();
+    let response = '';
+
+    if (lowerMessage.includes('ai') || lowerMessage.includes('work')) {
+      response = 'Our AI uses advanced machine learning algorithms to analyze your inventory patterns and predict stockouts with 95% accuracy. It continuously learns from your data to provide smarter recommendations! 🧠';
+    } else if (lowerMessage.includes('pricing') || lowerMessage.includes('cost')) {
+      response = 'We offer flexible pricing plans starting from $49/month. All plans include AI forecasting, real-time tracking, and 24/7 support. Want to see our full pricing? <a href="#pricing" style="color: #341755; text-decoration: underline;">Check it out</a> 💰';
+    } else if (lowerMessage.includes('trial') || lowerMessage.includes('free')) {
+      response = 'Great! You can start your free 14-day trial right now - no credit card required. <a href="/signup" style="color: #341755; text-decoration: underline;">Sign up here</a> to get started! 🚀';
+    } else if (lowerMessage.includes('waste')) {
+      response = 'Our platform helps reduce waste by 40% on average through predictive analytics and smart reordering. You\'ll save money and help the environment! 🌱';
+    } else if (lowerMessage.includes('demo')) {
+      response = 'I\'d love to show you a demo! You can <a href="#" style="color: #341755; text-decoration: underline;">book a personalized demo</a> with our team or watch a quick video tour. 🎥';
+    } else {
+      response = 'That\'s a great question! I recommend chatting with our team for more details. You can <a href="/signup" style="color: #341755; text-decoration: underline;">start your free trial</a> or <a href="#contact" style="color: #341755; text-decoration: underline;">contact us</a> directly. 😊';
     }
+
+    setTimeout(() => {
+      addMessage(response, false);
+    }, 500);
   };
 
   const handleSend = () => {

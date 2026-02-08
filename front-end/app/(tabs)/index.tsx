@@ -81,6 +81,7 @@ export default function HomeScreen() {
 
         <View style={{ flexDirection: 'row', gap: 10, flexWrap: 'wrap' }}>
           <Button title="Go to Login" onPress={() => router.push('/login')} />
+          <Button title="Go to Chatbot" onPress={() => router.push('/chatbot')} />
           <Button title="Logout" onPress={handleLogout} color="red" />
         </View>
 

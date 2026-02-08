@@ -118,49 +118,5 @@ def login():
 
 # Copy your login and dish routes here...
 
-# --- Chatbot Route ---
-@app.route("/chatbot", methods=["POST", "OPTIONS"])
-def chatbot():
-    if request.method == "OPTIONS":
-        return ("", 200)
-    
-    try:
-        data = request.get_json(silent=True)
-        if not data or 'message' not in data:
-            return jsonify({"error": "Missing message field"}), 400
-        
-        user_message = data.get('message', '').lower()
-        response = ''
-        
-        # AI-powered response logic
-        if 'ai' in user_message or 'work' in user_message:
-            response = 'Our AI uses advanced machine learning algorithms to analyze your inventory patterns and predict stockouts with 95% accuracy. It continuously learns from your data to provide smarter recommendations! 🧠'
-        elif 'pricing' in user_message or 'cost' in user_message or 'price' in user_message:
-            response = 'We offer flexible pricing plans starting from $49/month. All plans include AI forecasting, real-time tracking, and 24/7 support. Want to see our full pricing? 💰'
-        elif 'trial' in user_message or 'free' in user_message:
-            response = 'Great! You can start your free 14-day trial right now - no credit card required. Sign up to get started! 🚀'
-        elif 'waste' in user_message:
-            response = 'Our platform helps reduce waste by 40% on average through predictive analytics and smart reordering. You\'ll save money and help the environment! 🌱'
-        elif 'demo' in user_message:
-            response = 'I\'d love to show you a demo! You can book a personalized demo with our team or watch a quick video tour. 🎥'
-        elif 'hello' in user_message or 'hi' in user_message or 'hey' in user_message:
-            response = 'Hello! 👋 Welcome to StockSense. How can I help you today?'
-        elif 'feature' in user_message:
-            response = 'StockSense offers AI forecasting, smart reordering, waste analytics, real-time tracking, and automated alerts. What would you like to know more about?'
-        elif 'integration' in user_message or 'integrate' in user_message:
-            response = 'We integrate with popular POS systems, accounting software, and supply chain management tools. Our API makes it easy to connect with your existing workflow. 🔌'
-        elif 'support' in user_message or 'help' in user_message:
-            response = 'We offer 24/7 customer support via chat, email, and phone. Plus, you get access to our comprehensive knowledge base and video tutorials. 💬'
-        else:
-            response = 'That\'s a great question! I recommend chatting with our team for more details. You can start your free trial or contact us directly. 😊'
-        
-        return jsonify({
-            "response": response,
-            "timestamp": "just now"
-        }), 200
-    except Exception as e:
-        app.logger.exception("/chatbot failed with error")
-        return jsonify({"error": str(e)}), 500
-
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)

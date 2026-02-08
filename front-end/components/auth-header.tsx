@@ -16,13 +16,18 @@ type AuthHeaderProps = {
     activeRoute?: string;
 };
 
-const navItems = [
+const mainNavItems = [
     { label: 'Dashboard', route: '/Dashboard' },
     { label: 'Stock', route: '/Stock' },
     { label: 'Inventory', route: '/Inventory' },
+    { label: 'Sustainability', route: '/Sustainability' },
+    { label: 'Support', route: '/Support' },
+];
+
+const adminNavItems = [
     { label: 'Users', route: '/Users' },
     { label: 'Audit Logs', route: '/AuditLogs' },
-    { label: 'Support', route: '/Support' },
+    { label: 'Settings', route: '/Settings' },
 ];
 
 export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
@@ -108,15 +113,13 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
         }
     };
 
-    const handleNavPress = (item: typeof navItems[0]) => {
+    const handleNavPress = (item: { label: string; route: string }) => {
         if (item.route) {
             router.push(item.route);
         }
     };
 
-    const visibleNavItems = roleName.toLowerCase() === 'admin'
-        ? navItems
-        : navItems.filter((item) => item.route !== '/Users' && item.route !== '/AuditLogs');
+    const isAdmin = roleName.toLowerCase() === 'admin';
 
     return (
         <View style={styles.container}>
@@ -124,7 +127,7 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
                 <View style={styles.leftGroup}>
                     <Text style={styles.brand}>StockSense</Text>
                     <View style={styles.nav}>
-                        {visibleNavItems.map((item) => {
+                        {mainNavItems.map((item) => {
                             const isActive = activeRoute === item.route;
                             return (
                                 <TouchableOpacity key={item.label} onPress={() => handleNavPress(item)}>
@@ -135,6 +138,19 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
                     </View>
                 </View>
                 <View style={styles.rightGroup}>
+                    {isAdmin && (
+                        <View style={styles.adminGroup}>
+                            {adminNavItems.map((item) => {
+                                const isActive = activeRoute === item.route;
+                                return (
+                                    <TouchableOpacity key={item.label} onPress={() => handleNavPress(item)}>
+                                        <Text style={[styles.adminNavText, isActive && styles.adminNavTextActive]}>{item.label}</Text>
+                                    </TouchableOpacity>
+                                );
+                            })}
+                        </View>
+                    )}
+                    <View style={styles.divider} />
                     <View style={styles.userGroup}>
                         <Text style={styles.userName}>{orgName}</Text>
                         <Text style={styles.roleName}>
@@ -197,9 +213,35 @@ const styles = StyleSheet.create({
     rightGroup: {
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 14,
         flexWrap: 'wrap',
         marginLeft: 'auto',
+    },
+    adminGroup: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 14,
+        paddingHorizontal: 14,
+        paddingVertical: 6,
+        borderRadius: 8,
+        backgroundColor: Colors.landing.lightPurple,
+        borderWidth: 1,
+        borderColor: '#e5e7eb',
+    },
+    adminNavText: {
+        fontFamily: fontFamilies.semiBold,
+        color: Colors.landing.accentPurple,
+        fontWeight: '600',
+        fontSize: 13,
+    },
+    adminNavTextActive: {
+        color: Colors.landing.primaryPurple,
+        fontWeight: '700',
+    },
+    divider: {
+        width: 1,
+        height: 28,
+        backgroundColor: '#e5e7eb',
     },
     userGroup: {
         flexDirection: 'column',

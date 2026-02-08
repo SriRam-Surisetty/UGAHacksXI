@@ -10,6 +10,7 @@ import csv
 import json
 import re
 import logging
+import requests as http_requests
 from dotenv import load_dotenv
 from datetime import datetime
 from decimal import Decimal, InvalidOperation
@@ -71,6 +72,8 @@ class Org(db.Model):
     orgID = db.Column(db.Integer, primary_key=True)
     orgName = db.Column(db.String(100), nullable=False)
     org_email = db.Column(db.String(100))
+    latCoord = db.Column(db.Numeric(10, 8))
+    longCoord = db.Column(db.Numeric(11, 8))
 
 class User(db.Model):
     __tablename__ = 'users'
@@ -114,6 +117,38 @@ class AuditLog(db.Model):
     resource_id = db.Column(db.Integer, nullable=True)
     details = db.Column(db.Text, nullable=True)              # JSON string with extra context
     ip_address = db.Column(db.String(45), nullable=True)
+
+
+class OrgSettings(db.Model):
+    __tablename__ = 'org_settings'
+    id = db.Column(db.Integer, primary_key=True, autoincrement=True)
+    orgID = db.Column(db.Integer, db.ForeignKey('orgs.orgID'), unique=True, nullable=False)
+    settings_json = db.Column(db.Text, nullable=False, default='{}')
+
+
+DEFAULT_SETTINGS = {
+    "expiringSoonDays": 3,
+    "overstockThreshold": 10,
+    "lowStockThreshold": 2,
+    "sustainabilityRecipeDays": 5,
+    "nearbySearchRadius": 30,
+    "nearbyDirectory": "farmersmarket",
+    "currency": "USD",
+    "timezone": "America/New_York",
+}
+
+
+def get_org_settings(org_id):
+    """Return merged settings dict for an org (defaults + overrides)."""
+    row = OrgSettings.query.filter_by(orgID=org_id).first()
+    merged = dict(DEFAULT_SETTINGS)
+    if row and row.settings_json:
+        try:
+            overrides = json.loads(row.settings_json)
+            merged.update(overrides)
+        except (json.JSONDecodeError, TypeError):
+            pass
+    return merged
 
 
 def record_audit(action, resource_type, resource_id=None, details=None,
@@ -202,8 +237,30 @@ def signup():
         if missing_fields:
             return jsonify({"error": f"Missing fields: {', '.join(missing_fields)}"}), 400
 
-        # ... logic for creating Org and Admin User ...
-        new_org = Org(orgName=data.get("orgName"), org_email=data.get("email"))
+        # --- Geocode the address if provided ---
+        lat, lon = None, None
+        address_parts = [data.get("address1", ""), data.get("city", ""),
+                         data.get("state", ""), data.get("zipCode", ""),
+                         data.get("country", "")]
+        full_address = ", ".join(p for p in address_parts if p)
+        if full_address:
+            try:
+                geo_key = os.getenv("GEOCODING_API_KEY", "")
+                geo_resp = http_requests.get(
+                    "https://geocode.maps.co/search",
+                    params={"q": full_address, "api_key": geo_key},
+                    timeout=10,
+                )
+                geo_data = geo_resp.json()
+                if geo_data and len(geo_data) > 0:
+                    lat = float(geo_data[0]["lat"])
+                    lon = float(geo_data[0]["lon"])
+                    app.logger.info("Geocoded '%s' -> (%s, %s)", full_address, lat, lon)
+            except Exception:
+                app.logger.warning("Geocoding failed for '%s', continuing without coords", full_address)
+
+        new_org = Org(orgName=data.get("orgName"), org_email=data.get("email"),
+                      latCoord=lat, longCoord=lon)
         db.session.add(new_org)
         db.session.flush()
 
@@ -415,6 +472,161 @@ def modify_user(user_id):
         return jsonify({"error": str(e)}), 500
 
 
+# --- Organization & Settings Routes ---
+
+@app.route("/org", methods=["GET", "PATCH"])
+@jwt_required()
+def manage_org():
+    """Get or update the current user's organization details (admin only for PATCH)."""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        org = Org.query.get(user.orgID)
+        if not org:
+            return jsonify({"error": "Organization not found"}), 404
+
+        if request.method == "GET":
+            return jsonify({
+                "orgID": org.orgID,
+                "orgName": org.orgName,
+                "org_email": org.org_email,
+                "latCoord": float(org.latCoord) if org.latCoord is not None else None,
+                "longCoord": float(org.longCoord) if org.longCoord is not None else None,
+            }), 200
+
+        # PATCH — admin only
+        if user.uRole != 'admin':
+            return jsonify({"error": "Forbidden"}), 403
+
+        data = request.get_json(silent=True) or {}
+        changes = {}
+
+        new_name = data.get("orgName", "").strip()
+        if new_name and new_name != org.orgName:
+            changes["orgName"] = {"from": org.orgName, "to": new_name}
+            org.orgName = new_name
+
+        new_email = data.get("org_email", "").strip()
+        if new_email and new_email != org.org_email:
+            changes["org_email"] = {"from": org.org_email, "to": new_email}
+            org.org_email = new_email
+
+        # If address fields provided, re-geocode
+        address_parts = [data.get("address1", ""), data.get("city", ""),
+                         data.get("state", ""), data.get("zipCode", ""),
+                         data.get("country", "")]
+        full_address = ", ".join(p for p in address_parts if p)
+        if full_address:
+            try:
+                geo_key = os.getenv("GEOCODING_API_KEY", "")
+                geo_resp = http_requests.get(
+                    "https://geocode.maps.co/search",
+                    params={"q": full_address, "api_key": geo_key},
+                    timeout=10,
+                )
+                geo_data = geo_resp.json()
+                if geo_data and len(geo_data) > 0:
+                    new_lat = float(geo_data[0]["lat"])
+                    new_lon = float(geo_data[0]["lon"])
+                    changes["location"] = {
+                        "from": f"{org.latCoord}, {org.longCoord}",
+                        "to": f"{new_lat}, {new_lon}",
+                    }
+                    org.latCoord = new_lat
+                    org.longCoord = new_lon
+            except Exception:
+                app.logger.warning("Geocoding failed during org update")
+
+        # Direct lat/long override
+        if "latCoord" in data and "longCoord" in data:
+            try:
+                org.latCoord = float(data["latCoord"]) if data["latCoord"] is not None else None
+                org.longCoord = float(data["longCoord"]) if data["longCoord"] is not None else None
+                changes["coords"] = "updated directly"
+            except (TypeError, ValueError):
+                pass
+
+        record_audit("UPDATE", "org", resource_id=org.orgID,
+                      details=changes,
+                      user_id=user.userID, org_id=org.orgID)
+        db.session.commit()
+        return jsonify({
+            "msg": "Organization updated",
+            "orgID": org.orgID,
+            "orgName": org.orgName,
+            "org_email": org.org_email,
+            "latCoord": float(org.latCoord) if org.latCoord is not None else None,
+            "longCoord": float(org.longCoord) if org.longCoord is not None else None,
+        }), 200
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("/org failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/settings", methods=["GET", "PATCH"])
+@jwt_required()
+def manage_settings():
+    """Get or update org-level settings (admin only for PATCH)."""
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        org_id = user.orgID
+
+        if request.method == "GET":
+            settings = get_org_settings(org_id)
+            return jsonify({"settings": settings}), 200
+
+        # PATCH — admin only
+        if user.uRole != 'admin':
+            return jsonify({"error": "Forbidden"}), 403
+
+        data = request.get_json(silent=True) or {}
+        if not data:
+            return jsonify({"error": "No settings provided"}), 400
+
+        # Load existing overrides
+        row = OrgSettings.query.filter_by(orgID=org_id).first()
+        if row:
+            try:
+                existing = json.loads(row.settings_json)
+            except (json.JSONDecodeError, TypeError):
+                existing = {}
+        else:
+            existing = {}
+            row = OrgSettings(orgID=org_id, settings_json='{}')
+            db.session.add(row)
+
+        # Only allow known keys
+        allowed_keys = set(DEFAULT_SETTINGS.keys())
+        changes = {}
+        for key, value in data.items():
+            if key in allowed_keys:
+                old_val = existing.get(key, DEFAULT_SETTINGS.get(key))
+                existing[key] = value
+                if old_val != value:
+                    changes[key] = {"from": old_val, "to": value}
+
+        row.settings_json = json.dumps(existing, default=str)
+        record_audit("UPDATE", "settings", resource_id=org_id,
+                      details=changes,
+                      user_id=user.userID, org_id=org_id)
+        db.session.commit()
+
+        merged = get_org_settings(org_id)
+        return jsonify({"msg": "Settings updated", "settings": merged}), 200
+
+    except Exception as e:
+        db.session.rollback()
+        app.logger.exception("/settings failed")
+        return jsonify({"error": str(e)}), 500
+
+
 # --- Dashboard Route ---
 
 @app.route("/dashboard", methods=["GET"])
@@ -428,9 +640,10 @@ def dashboard_summary():
 
         org_id = user.orgID
         org = Org.query.get(org_id) if org_id else None
+        settings = get_org_settings(org_id)
         today = datetime.utcnow().date()
         from datetime import timedelta
-        soon = today + timedelta(days=3)
+        soon = today + timedelta(days=settings.get("expiringSoonDays", 3))
 
         # ---- Stock batches with qty via __STOCK__ dish ----
         stock_dish = Dish.query.filter(
@@ -2201,6 +2414,199 @@ def chat_endpoint():
     except Exception as e:
         app.logger.exception("/chat failed with error")
         return jsonify({"error": str(e)}), 500
+
+
+# ─── Sustainability Endpoints ────────────────────────────────────────────────
+
+@app.route("/sustainability/recipes", methods=["GET"])
+@jwt_required()
+def sustainability_recipes():
+    """
+    Use Gemini to suggest recipes for overstocked or expiring-soon ingredients.
+    """
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        org_id = user.orgID
+
+        settings = get_org_settings(org_id)
+        overstock_threshold = settings.get("overstockThreshold", 10)
+        recipe_days = settings.get("sustainabilityRecipeDays", 5)
+
+        # Grab stock batches that are expiring within recipe_days or are overstocked
+        stock_dish = Dish.query.filter(
+            Dish.orgID == org_id,
+            Dish.dishName == STOCK_DISH_NAME,
+        ).first()
+        stock_dish_id = stock_dish.dishID if stock_dish else None
+
+        today = datetime.utcnow().date()
+        from datetime import timedelta
+        soon = today + timedelta(days=recipe_days)
+
+        # Get expiring-soon batches
+        expiring = Ingredient.query.filter(
+            Ingredient.orgID == org_id,
+            Ingredient.expiry.isnot(None),
+            Ingredient.expiry <= soon,
+            Ingredient.expiry >= today,
+        ).all()
+
+        # Get overstocked batches (qty > threshold)
+        overstocked_ids = []
+        if stock_dish_id:
+            high_qty = DishIngredient.query.filter(
+                DishIngredient.dishID == stock_dish_id,
+                DishIngredient.qty > overstock_threshold,
+            ).all()
+            overstocked_ids = [row.ingID for row in high_qty]
+
+        overstocked = []
+        if overstocked_ids:
+            overstocked = Ingredient.query.filter(
+                Ingredient.ingID.in_(overstocked_ids),
+                Ingredient.orgID == org_id,
+            ).all()
+
+        # Build ingredient list for Gemini prompt
+        ingredient_names = list(set(
+            [ing.ingName for ing in expiring] + [ing.ingName for ing in overstocked]
+        ))
+
+        if not ingredient_names:
+            return jsonify({
+                "recipes": [],
+                "message": "No expiring or overstocked ingredients found.",
+                "ingredients_used": [],
+            }), 200
+
+        # Ask Gemini for recipes
+        gemini_key = os.getenv("GEMINI_API_KEY", "")
+        if not gemini_key:
+            return jsonify({"error": "Gemini API key not configured"}), 500
+
+        import google.generativeai as genai
+        genai.configure(api_key=gemini_key)
+        model = genai.GenerativeModel("gemini-2.5-flash-lite")
+
+        prompt = (
+            f"I have these ingredients that are expiring soon or overstocked: "
+            f"{', '.join(ingredient_names)}.\n\n"
+            f"Suggest 3-5 practical recipes to use them up. "
+            f"For each recipe, provide:\n"
+            f"- Recipe name\n"
+            f"- Brief description (1-2 sentences)\n"
+            f"- Ingredients used from my list\n"
+            f"- Simple cooking steps (3-5 steps)\n\n"
+            f"Return ONLY valid JSON array with objects having keys: "
+            f"\"name\", \"description\", \"ingredients\" (array of strings), \"steps\" (array of strings). "
+            f"No markdown, no code fences, just the JSON array."
+        )
+
+        response = model.generate_content(prompt)
+        raw_text = response.text.strip()
+
+        # Strip markdown code fences if present
+        if raw_text.startswith("```"):
+            raw_text = re.sub(r"^```(?:json)?\s*", "", raw_text)
+            raw_text = re.sub(r"\s*```$", "", raw_text)
+
+        recipes = json.loads(raw_text)
+
+        return jsonify({
+            "recipes": recipes,
+            "ingredients_used": ingredient_names,
+        }), 200
+
+    except Exception as e:
+        app.logger.exception("/sustainability/recipes failed")
+        return jsonify({"error": str(e)}), 500
+
+
+@app.route("/sustainability/nearby-food-resources", methods=["GET"])
+@jwt_required()
+def nearby_food_resources():
+    """
+    Proxy to the USDA Local Food Portal API to find nearby food shelters,
+    farmers markets, food hubs, etc. using the org's geocoded location.
+    Supports query params: directory, radius, zip, state, city
+    """
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        org = Org.query.get(user.orgID)
+        if not org:
+            return jsonify({"error": "Organization not found"}), 404
+
+        usda_key = os.getenv("usdalocalfoodportal_API_KEY", "")
+        if not usda_key:
+            return jsonify({"error": "USDA API key not configured"}), 500
+
+        # Which USDA directory to query
+        directory = request.args.get("directory", "farmersmarket")
+        valid_dirs = ["agritourism", "csa", "farmersmarket", "foodhub", "onfarmmarket"]
+        if directory not in valid_dirs:
+            directory = "farmersmarket"
+
+        radius = request.args.get("radius", "30")
+
+        # Build query params — prefer org lat/long, fall back to zip/state params
+        params = {"apikey": usda_key}
+
+        q_zip = request.args.get("zip", "")
+        q_state = request.args.get("state", "")
+        q_city = request.args.get("city", "")
+
+        if org.latCoord is not None and org.longCoord is not None:
+            params["x"] = str(float(org.longCoord))
+            params["y"] = str(float(org.latCoord))
+            params["radius"] = radius
+        elif q_zip:
+            params["zip"] = q_zip
+            params["radius"] = radius
+        elif q_state:
+            params["state"] = q_state
+            if q_city:
+                params["city"] = q_city
+        else:
+            return jsonify({
+                "error": "No location available. Please update your organization address or provide zip/state parameters."
+            }), 400
+
+        url = f"https://www.usdalocalfoodportal.com/api/{directory}/"
+        app.logger.info("USDA API request: %s params=%s", url, params)
+
+        resp = http_requests.get(url, params=params, timeout=15)
+
+        if resp.status_code != 200:
+            app.logger.warning("USDA API returned %s: %s", resp.status_code, resp.text[:500])
+            return jsonify({"error": "USDA API error", "status": resp.status_code}), 502
+
+        data = resp.json() if resp.text.strip() else []
+
+        # Normalize if the API returns something unexpected
+        if not isinstance(data, list):
+            data = []
+
+        return jsonify({
+            "directory": directory,
+            "radius": radius,
+            "results": data,
+            "count": len(data),
+            "org_location": {
+                "lat": float(org.latCoord) if org.latCoord else None,
+                "lon": float(org.longCoord) if org.longCoord else None,
+            },
+        }), 200
+
+    except Exception as e:
+        app.logger.exception("/sustainability/nearby-food-resources failed")
+        return jsonify({"error": str(e)}), 500
+
 
 if __name__ == '__main__':
     with app.app_context():

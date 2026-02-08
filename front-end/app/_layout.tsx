@@ -54,7 +54,11 @@ export default function RootLayout() {
         <Stack.Screen name="Stock" options={{ headerShown: false }} />
         <Stack.Screen name="Inventory" options={{ headerShown: false }} />
         <Stack.Screen name="Support" options={{ headerShown: false }} />
+        <Stack.Screen name="Sustainability" options={{ headerShown: false }} />
         <Stack.Screen name="Users" options={{ headerShown: false }} />
+        <Stack.Screen name="AuditLogs" options={{ headerShown: false }} />
+        <Stack.Screen name="Price" options={{ headerShown: false }} />
+        <Stack.Screen name="Settings" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="modal" options={{ presentation: 'modal', title: 'Modal' }} />
       </Stack>

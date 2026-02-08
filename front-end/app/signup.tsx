@@ -60,6 +60,12 @@ export default function SignupScreen() {
                 email,
                 password,
                 orgName,
+                address1,
+                address2,
+                city,
+                state,
+                zipCode,
+                country,
             });
 
             if (response.status === 201) {

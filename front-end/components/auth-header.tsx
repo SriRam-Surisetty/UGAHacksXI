@@ -1,7 +1,8 @@
+import { useEffect } from 'react';
 import { StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
-import { deleteToken, deleteUserId } from '@/services/storage';
+import { deleteToken, deleteUserId, getToken } from '@/services/storage';
 
 const fontFamilies = {
     regular: 'IBMPlexSans_400Regular',
@@ -26,6 +27,31 @@ const navItems = [
 
 export default function AuthHeader({ activeRoute, onChatPress }: AuthHeaderProps) {
     const router = useRouter();
+
+    useEffect(() => {
+        let isMounted = true;
+
+        const verifySession = async () => {
+            try {
+                const token = await getToken();
+                if (!token && isMounted) {
+                    await deleteToken();
+                    await deleteUserId();
+                    router.replace('/login');
+                }
+            } catch (error) {
+                if (isMounted) {
+                    router.replace('/login');
+                }
+            }
+        };
+
+        verifySession();
+
+        return () => {
+            isMounted = false;
+        };
+    }, [router]);
 
     const handleLogout = async () => {
         try {

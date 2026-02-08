@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react';
 import {
-    Alert,
     Dimensions,
     Platform,
     SafeAreaView,
@@ -25,6 +24,7 @@ export default function LoginScreen() {
     const [password, setPassword] = useState('');
     const [rememberMe, setRememberMe] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
+    const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const router = useRouter();
 
     useEffect(() => {
@@ -48,18 +48,9 @@ export default function LoginScreen() {
         };
     }, [router]);
 
-    const showAlert = (title: string, message: string) => {
-        if (Platform.OS === 'web' && typeof globalThis !== 'undefined' && 'alert' in globalThis) {
-            (globalThis as { alert: (text: string) => void }).alert(`${title}\n\n${message}`);
-            return;
-        }
-
-        Alert.alert(title, message);
-    };
-
     const handleLogin = async () => {
         if (!email || !password) {
-            showAlert('Error', 'Please fill in all fields');
+            setNotice({ type: 'error', message: 'Please fill in all fields.' });
             return;
         }
 
@@ -75,7 +66,7 @@ export default function LoginScreen() {
             if (response.data.access_token) {
                 await saveToken(response.data.access_token);
                 await saveUserId(email);
-                showAlert('Success', 'Login successful');
+                setNotice({ type: 'success', message: 'Login successful. Redirecting...' });
                 router.replace('/Dashboard');
             }
         } catch (error: any) {
@@ -84,14 +75,14 @@ export default function LoginScreen() {
                 status === 401 || status === 400
                     ? 'Invalid email or password.'
                     : error.response?.data?.msg || 'An error occurred';
-            showAlert('Login failed', message);
+            setNotice({ type: 'error', message });
         } finally {
             setIsLoading(false);
         }
     };
 
     const handleForgotPassword = () => {
-        showAlert('Reset password', 'Password reset is not available yet.');
+        setNotice({ type: 'error', message: 'Password reset is not available yet.' });
     };
 
     const navigateToHome = () => {
@@ -135,6 +126,12 @@ export default function LoginScreen() {
                             <Text style={styles.title}>Welcome back.</Text>
                             <Text style={styles.subtitle}>Use your account to get back to your inventory.</Text>
                         </View>
+
+                        {notice && (
+                            <View style={[styles.notice, notice.type === 'success' ? styles.noticeSuccess : styles.noticeError]}>
+                                <Text style={styles.noticeText}>{notice.message}</Text>
+                            </View>
+                        )}
 
                         <View style={styles.formGroup}>
                             <Text style={styles.label}>Email</Text>
@@ -329,6 +326,26 @@ const styles = StyleSheet.create({
         color: '#4a4a4a',
     },
     formGroup: {
+    notice: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        marginTop: 16,
+        borderWidth: 1,
+    },
+    noticeSuccess: {
+        backgroundColor: '#eefaf2',
+        borderColor: '#bbf7d0',
+    },
+    noticeError: {
+        backgroundColor: '#fef2f2',
+        borderColor: '#fecaca',
+    },
+    noticeText: {
+        fontSize: 13,
+        color: '#374151',
+        fontWeight: '600',
+    },
         marginBottom: 18,
     },
     label: {

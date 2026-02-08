@@ -1,13 +1,15 @@
+import React, { useState } from 'react';
 import { StyleSheet, View, Text, TouchableOpacity, Dimensions, ScrollView, Platform } from 'react-native';
 import { Link } from 'expo-router';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Colors } from '@/constants/theme';
 import { Ionicons } from '@expo/vector-icons';
-import FloatingChatButton from '@/components/FloatingChatButton';
+import ChatWidget from '@/components/ChatWidget';
 
 const { width } = Dimensions.get('window');
 
 export default function LandingPage() {
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     return (
         <SafeAreaView style={styles.container}>
@@ -50,6 +52,15 @@ export default function LandingPage() {
                                 <Ionicons name="arrow-forward" size={20} color="#fff" style={{ marginLeft: 8 }} />
                             </TouchableOpacity>
                         </Link>
+
+                        {/* Chat widget popup instead of full-page navigation */}
+                        <TouchableOpacity
+                            style={styles.secondaryButton}
+                            onPress={() => setIsChatOpen(true)}
+                        >
+                            <Ionicons name="chatbubbles-outline" size={20} color={Colors.landing.primaryPurple} style={{ marginRight: 8 }} />
+                            <Text style={styles.secondaryButtonText}>Chat with AI</Text>
+                        </TouchableOpacity>
                     </View>
                 </View>
 
@@ -81,8 +92,8 @@ export default function LandingPage() {
 
             </ScrollView>
 
-            {/* Floating Chat Button */}
-            <FloatingChatButton />
+            {/* Floating Chat Widget */}
+            <ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
         </SafeAreaView>
     );
 }

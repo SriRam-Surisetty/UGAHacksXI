@@ -3,20 +3,22 @@ import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
-import FloatingChatButton from '@/components/FloatingChatButton';
+import ChatWidget from '@/components/ChatWidget';
 
 export default function Support() {
+	const [isChatOpen, setIsChatOpen] = useState(false);
+
 	return (
 		<SafeAreaView style={styles.container}>
 			<StatusBar style="dark" />
-			<AuthHeader activeRoute="/Support" />
+			<AuthHeader activeRoute="/Support" onChatPress={() => setIsChatOpen(true)} />
 			<View style={styles.content}>
 				<Text style={styles.title}>Support</Text>
 				<Text style={styles.subtitle}>Support workflows will appear here.</Text>
 			</View>
 
-			{/* Floating Chat Button */}
-			<FloatingChatButton />
+			{/* Floating Chat Widget */}
+			<ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
 		</SafeAreaView>
 	);
 }

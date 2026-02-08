@@ -1,5 +1,4 @@
 import React, { useState, useRef, useEffect } from 'react';
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import {
     StyleSheet,
     View,
@@ -80,8 +79,6 @@ function TypingIndicator() {
     );
 }
 
-const CHAT_HISTORY_KEY = 'stocksense_chat_history';
-
 export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
     const [messages, setMessages] = useState<Message[]>([
         {
@@ -100,41 +97,6 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
     // Check platform at render time, not module load time
     const isWeb = Platform.OS === 'web';
     const isLargeScreen = SCREEN_WIDTH > 768;
-
-    // Load chat history on mount
-    useEffect(() => {
-        loadChatHistory();
-    }, []);
-
-    // Save chat history whenever messages change
-    useEffect(() => {
-        saveChatHistory();
-    }, [messages]);
-
-    const loadChatHistory = async () => {
-        try {
-            const saved = await AsyncStorage.getItem(CHAT_HISTORY_KEY);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                // Convert timestamp strings back to Date objects
-                const messagesWithDates = parsed.map((msg: any) => ({
-                    ...msg,
-                    timestamp: new Date(msg.timestamp),
-                }));
-                setMessages(messagesWithDates);
-            }
-        } catch (error) {
-            console.error('Failed to load chat history:', error);
-        }
-    };
-
-    const saveChatHistory = async () => {
-        try {
-            await AsyncStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
-        } catch (error) {
-            console.error('Failed to save chat history:', error);
-        }
-    };
 
     useEffect(() => {
         if (isOpen) {

@@ -3,18 +3,19 @@ import { Dimensions, Platform, SafeAreaView, ScrollView, StyleSheet, Text, View 
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
-import FloatingChatButton from '@/components/FloatingChatButton';
+import ChatWidget from '@/components/ChatWidget';
 
 const { width } = Dimensions.get('window');
 
 export default function Dashboard() {
 	const isWide = width >= 900;
 	const isMid = width >= 720;
+	const [isChatOpen, setIsChatOpen] = useState(false);
 
 	return (
 		<SafeAreaView style={styles.container}>
 			<StatusBar style="dark" />
-			<AuthHeader activeRoute="/Dashboard" />
+			<AuthHeader activeRoute="/Dashboard" onChatPress={() => setIsChatOpen(true)} />
 
 			<ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
 				<View style={styles.contentWrapper}>
@@ -174,8 +175,8 @@ export default function Dashboard() {
 				</View>
 			</ScrollView>
 
-			{/* Floating Chat Button */}
-			<FloatingChatButton />
+			{/* Floating Chat Widget */}
+			<ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
 		</SafeAreaView>
 	);
 }

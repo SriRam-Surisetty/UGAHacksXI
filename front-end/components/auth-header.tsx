@@ -13,17 +13,19 @@ const fontFamilies = {
 
 type AuthHeaderProps = {
     activeRoute?: string;
+    onChatPress?: () => void;
 };
 
 const navItems = [
     { label: 'Dashboard', route: '/Dashboard' },
     { label: 'Stock', route: '/Stock' },
     { label: 'Inventory', route: '/Inventory' },
+    { label: 'Chat', route: null }, // Chat uses popup instead of navigation
     { label: 'Support', route: '/Support' },
     { label: 'Users', route: '/Users' },
 ];
 
-export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
+export default function AuthHeader({ activeRoute, onChatPress }: AuthHeaderProps) {
     const router = useRouter();
 
     useEffect(() => {
@@ -61,7 +63,9 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
     };
 
     const handleNavPress = (item: typeof navItems[0]) => {
-        if (item.route) {
+        if (item.label === 'Chat' && onChatPress) {
+            onChatPress();
+        } else if (item.route) {
             router.push(item.route);
         }
     };

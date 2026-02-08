@@ -440,12 +440,27 @@ export default function Inventory() {
 
 					<View style={styles.tableCard}>
 						<View style={styles.tableHeader}>
-							{tableHeaders.map((label) => (
-								<View key={label} style={styles.tableHeaderCell}>
-									<Text style={styles.tableHeaderText}>{label}</Text>
-								</View>
-							))}
-							<View style={styles.tableHeaderCell} />
+							{activeTab === 'dishes' ? (
+								<>
+									<View style={[styles.tableHeaderCell, styles.cellName]}>
+										<Text style={styles.tableHeaderText}>Dish Name</Text>
+									</View>
+									<View style={[styles.tableHeaderCell, styles.cellActions]} />
+								</>
+							) : (
+								<>
+									<View style={[styles.tableHeaderCell, styles.cellName]}>
+										<Text style={styles.tableHeaderText}>Ingredient Name</Text>
+									</View>
+									<View style={[styles.tableHeaderCell, styles.cellCategory]}>
+										<Text style={styles.tableHeaderText}>Category</Text>
+									</View>
+									<View style={[styles.tableHeaderCell, styles.cellMetric]}>
+										<Text style={[styles.tableHeaderText, { textAlign: 'right', width: '100%' }]}>Linked Dishes</Text>
+									</View>
+									<View style={[styles.tableHeaderCell, styles.cellActions]} />
+								</>
+							)}
 						</View>
 
 						{isLoading && (

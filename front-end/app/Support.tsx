@@ -64,8 +64,8 @@ export default function Support() {
 								<Ionicons name="mail-outline" size={24} color={Colors.landing.primaryPurple} />
 							</View>
 							<Text style={styles.contactTitle}>Email Support</Text>
-							<TouchableOpacity style={styles.ctaButton} onPress={() => Linking.openURL('mailto:stocksense@mailanator.com')}>
-								<Text style={styles.ctaButtonText}>stocksense@mailanator.com</Text>
+							<TouchableOpacity style={styles.ctaButton} onPress={() => Linking.openURL('mailto:stocksense@mailinator.com')}>
+								<Text style={styles.ctaButtonText}>stocksense@mailinator.com</Text>
 							</TouchableOpacity>
 						</View>
 

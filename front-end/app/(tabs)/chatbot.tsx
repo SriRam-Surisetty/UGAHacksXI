@@ -15,6 +15,7 @@ import { useColorScheme } from '@/hooks/use-color-scheme';
 import { IconSymbol } from '@/components/ui/icon-symbol';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
+import Markdown from 'react-native-markdown-display';
 
 // Cast components to any to fix strict TS error "JSX element class does not support attributes"
 const TextInput = NativeTextInput as any;
@@ -99,6 +100,8 @@ export default function Chatbot() {
         }
     }, [messages]);
 
+
+
     const renderMessage = ({ item }: { item: Message }) => {
         const isUser = item.sender === 'user';
         return (
@@ -109,9 +112,31 @@ export default function Chatbot() {
                     { backgroundColor: isUser ? theme.tint : (colorScheme === 'dark' ? '#333' : '#e5e5ea') }
                 ]}
             >
-                <ThemedText style={[styles.messageText, isUser && styles.userMessageText]}>
-                    {item.text}
-                </ThemedText>
+                {isUser ? (
+                    <ThemedText style={[styles.messageText, styles.userMessageText]}>
+                        {item.text}
+                    </ThemedText>
+                ) : (
+                    <Markdown
+                        style={{
+                            body: { color: colorScheme === 'dark' ? '#ECEDEE' : '#11181C', fontSize: 16 },
+                            heading1: { color: colorScheme === 'dark' ? '#ECEDEE' : '#11181C' },
+                            heading2: { color: colorScheme === 'dark' ? '#ECEDEE' : '#11181C' },
+                            heading3: { color: colorScheme === 'dark' ? '#ECEDEE' : '#11181C' },
+                            heading4: { color: colorScheme === 'dark' ? '#ECEDEE' : '#11181C' },
+                            heading5: { color: colorScheme === 'dark' ? '#ECEDEE' : '#11181C' },
+                            heading6: { color: colorScheme === 'dark' ? '#ECEDEE' : '#11181C' },
+                            strong: { fontWeight: 'bold', color: colorScheme === 'dark' ? '#ECEDEE' : '#11181C' },
+                            em: { fontStyle: 'italic', color: colorScheme === 'dark' ? '#ECEDEE' : '#11181C' },
+                            link: { color: theme.tint },
+                            blockquote: { backgroundColor: colorScheme === 'dark' ? '#444' : '#f0f0f0', borderLeftColor: theme.tint },
+                            code_inline: { backgroundColor: colorScheme === 'dark' ? '#444' : '#f0f0f0', color: colorScheme === 'dark' ? '#ECEDEE' : '#11181C' },
+                            code_block: { backgroundColor: colorScheme === 'dark' ? '#444' : '#f0f0f0', color: colorScheme === 'dark' ? '#ECEDEE' : '#11181C' },
+                        }}
+                    >
+                        {item.text}
+                    </Markdown>
+                )}
             </ThemedView>
         );
     };

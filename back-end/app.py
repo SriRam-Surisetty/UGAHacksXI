@@ -118,5 +118,37 @@ def login():
 
 # Copy your login and dish routes here...
 
+# --- Gemini Chatbot Route ---
+import google.generativeai as genai
+
+@app.route("/chat", methods=["POST"])
+def chat():
+    try:
+        data = request.get_json(silent=True)
+        if not data:
+            return jsonify({"error": "Missing JSON body"}), 400
+
+        message = data.get("message")
+        if not message:
+            return jsonify({"error": "Missing message field"}), 400
+
+        api_key = os.getenv("GEMINI_API_KEY")
+        if not api_key:
+            app.logger.error("GEMINI_API_KEY is not set")
+            return jsonify({"error": "Server configuration error: API key missing"}), 500
+
+        genai.configure(api_key=api_key)
+        # Using gemini-flash-latest as verified in previous steps
+        model = genai.GenerativeModel('gemini-flash-latest')
+        
+        chat = model.start_chat(history=[])
+        response = chat.send_message(message)
+        
+        return jsonify({"response": response.text}), 200
+
+    except Exception as e:
+        app.logger.exception("/chat failed with error")
+        return jsonify({"error": str(e)}), 500
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)

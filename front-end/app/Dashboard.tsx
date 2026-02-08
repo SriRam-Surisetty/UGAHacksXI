@@ -1,21 +1,22 @@
 import React, { useState } from 'react';
 import { Dimensions, Platform, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Link } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
-import ChatWidget from '@/components/ChatWidget';
+import FloatingChatButton from '@/components/FloatingChatButton';
+import { Ionicons } from '@expo/vector-icons';
 
 const { width } = Dimensions.get('window');
 
 export default function Dashboard() {
 	const isWide = width >= 900;
 	const isMid = width >= 720;
-	const [isChatOpen, setIsChatOpen] = useState(false);
 
 	return (
 		<SafeAreaView style={styles.container}>
 			<StatusBar style="dark" />
-			<AuthHeader activeRoute="/Dashboard" onChatPress={() => setIsChatOpen(true)} />
+			<AuthHeader activeRoute="/Dashboard" />
 
 			<ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
 				<View style={styles.contentWrapper}>
@@ -31,7 +32,12 @@ export default function Dashboard() {
 									<View style={styles.alertDot} />
 									<Text style={styles.cardHeaderTitle}>Use Now: Expiring Batches</Text>
 								</View>
-								<Text style={styles.cardHeaderLink}>Manage Inventory</Text>
+								<Link href="/Inventory">
+									<View style={styles.linkWrapper}>
+										<Text style={styles.cardHeaderLink}>Manage Inventory</Text>
+										<Ionicons name="arrow-forward" size={12} color={Colors.landing.primaryPurple} />
+									</View>
+								</Link>
 							</View>
 							<View style={styles.cardBody}>
 								<View style={styles.rowBetween}>
@@ -66,7 +72,12 @@ export default function Dashboard() {
 									<View style={styles.iconCircle} />
 									<Text style={styles.cardHeaderTitle}>Restock: Low Inventory</Text>
 								</View>
-								<Text style={styles.cardHeaderLink}>Update Stock</Text>
+								<Link href="/Stock">
+									<View style={styles.linkWrapper}>
+										<Text style={styles.cardHeaderLink}>Update Stock</Text>
+										<Ionicons name="arrow-forward" size={12} color={Colors.landing.primaryPurple} />
+									</View>
+								</Link>
 							</View>
 							<View style={styles.cardBody}>
 								<View style={styles.rowBetween}>
@@ -175,8 +186,7 @@ export default function Dashboard() {
 				</View>
 			</ScrollView>
 
-			{/* Floating Chat Widget */}
-			<ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
+			<FloatingChatButton />
 		</SafeAreaView>
 	);
 }
@@ -301,6 +311,12 @@ const styles = StyleSheet.create({
 		textTransform: 'uppercase',
 		letterSpacing: 1.4,
 		color: Colors.landing.primaryPurple,
+		textDecorationLine: 'underline',
+	},
+	linkWrapper: {
+		flexDirection: 'row',
+		alignItems: 'center',
+		gap: 4,
 	},
 	alertDot: {
 		width: 8,

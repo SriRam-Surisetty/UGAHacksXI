@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import {
-    Alert,
     Dimensions,
     Platform,
     SafeAreaView,
@@ -35,29 +34,21 @@ export default function SignupScreen() {
     const [termsAccepted, setTermsAccepted] = useState(false);
     const router = useRouter();
     const [isLoading, setIsLoading] = useState(false);
-
-    const showAlert = (title: string, message: string) => {
-        if (Platform.OS === 'web' && typeof globalThis !== 'undefined' && 'alert' in globalThis) {
-            (globalThis as { alert: (text: string) => void }).alert(`${title}\n\n${message}`);
-            return;
-        }
-
-        Alert.alert(title, message);
-    };
+    const [notice, setNotice] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
 
     const handleSignup = async () => {
         if (!email || !password || !confirmPassword || !orgName || !address1 || !city || !state || !zipCode || !country) {
-            showAlert('Error', 'Please fill in all required fields');
+            setNotice({ type: 'error', message: 'Please fill in all required fields.' });
             return;
         }
 
         if (password !== confirmPassword) {
-            showAlert('Error', 'Passwords do not match');
+            setNotice({ type: 'error', message: 'Passwords do not match.' });
             return;
         }
 
         if (!termsAccepted) {
-            showAlert('Error', 'You must agree to the Terms of Service');
+            setNotice({ type: 'error', message: 'You must agree to the Terms of Service.' });
             return;
         }
 
@@ -75,14 +66,14 @@ export default function SignupScreen() {
             });
 
             if (response.status === 201) {
-                showAlert('Success', 'Account created. Please sign in.');
+                setNotice({ type: 'success', message: 'Account created. Please sign in.' });
                 router.replace('/login');
                 return;
             }
 
-            showAlert('Signup failed', response.data?.msg || 'An error occurred');
+            setNotice({ type: 'error', message: response.data?.msg || 'An error occurred.' });
         } catch (error: any) {
-            showAlert('Signup failed', error.response?.data?.msg || 'An error occurred');
+            setNotice({ type: 'error', message: error.response?.data?.msg || 'An error occurred.' });
         } finally {
             setIsLoading(false);
         }
@@ -129,6 +120,12 @@ export default function SignupScreen() {
                             <Text style={styles.title}>Set up your workspace.</Text>
                             <Text style={styles.subtitle}>Tell us who you are and where you operate.</Text>
                         </View>
+
+                        {notice && (
+                            <View style={[styles.notice, notice.type === 'success' ? styles.noticeSuccess : styles.noticeError]}>
+                                <Text style={styles.noticeText}>{notice.message}</Text>
+                            </View>
+                        )}
 
                         <View style={styles.section}>
                             <Text style={styles.sectionTitle}>Account</Text>
@@ -415,6 +412,26 @@ const styles = StyleSheet.create({
         color: '#4a4a4a',
     },
     section: {
+    notice: {
+        paddingVertical: 10,
+        paddingHorizontal: 12,
+        borderRadius: 10,
+        marginTop: 16,
+        borderWidth: 1,
+    },
+    noticeSuccess: {
+        backgroundColor: '#eefaf2',
+        borderColor: '#bbf7d0',
+    },
+    noticeError: {
+        backgroundColor: '#fef2f2',
+        borderColor: '#fecaca',
+    },
+    noticeText: {
+        fontSize: 13,
+        color: '#374151',
+        fontWeight: '600',
+    },
         marginBottom: 20,
         padding: 16,
         borderRadius: 16,

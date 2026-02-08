@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { StatusBar } from 'expo-status-bar';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
+import FloatingChatButton from '@/components/FloatingChatButton';
 import api from '@/services/api';
 
 type DishRow = {
@@ -61,8 +62,8 @@ type SelectedRow = {
 };
 
 export default function Inventory() {
-    const [activeTab, setActiveTab] = useState<TabKey>('dishes');
-    const [search, setSearch] = useState('');
+	const [activeTab, setActiveTab] = useState<TabKey>('dishes');
+	const [search, setSearch] = useState('');
 	const [category, setCategory] = useState('');
 	const [showCategoryMenu, setShowCategoryMenu] = useState(false);
 	const [dishesData, setDishesData] = useState<DishRow[]>([]);
@@ -136,15 +137,15 @@ export default function Inventory() {
 					const response = await api.get('/inventory/ingredients', {
 						params: Object.keys(params).length ? params : undefined,
 					});
-						const ingredients = response.data?.ingredients ?? [];
-						setIngredientsData(
-							ingredients.map((ing: { ingID: number; ingName?: string; category?: string; linkedDishes?: number }) => ({
-								id: ing.ingID,
-								name: ing.ingName || '-',
-								category: ing.category || '-',
-								linkedDishes: typeof ing.linkedDishes === 'number' ? String(ing.linkedDishes) : '-',
-							}))
-						);
+					const ingredients = response.data?.ingredients ?? [];
+					setIngredientsData(
+						ingredients.map((ing: { ingID: number; ingName?: string; category?: string; linkedDishes?: number }) => ({
+							id: ing.ingID,
+							name: ing.ingName || '-',
+							category: ing.category || '-',
+							linkedDishes: typeof ing.linkedDishes === 'number' ? String(ing.linkedDishes) : '-',
+						}))
+					);
 				}
 			} catch (fetchError) {
 				setError('Unable to load inventory data.');
@@ -172,11 +173,11 @@ export default function Inventory() {
 		return ['All Categories', ...Array.from(unique).sort()];
 	}, [ingredientsData]);
 
-    const tableHeaders = activeTab === 'dishes'
-        ? ['Dish Name', 'Category', 'Popularity (Monthly)', 'Last Modified']
+	const tableHeaders = activeTab === 'dishes'
+		? ['Dish Name', 'Category', 'Popularity (Monthly)', 'Last Modified']
 		: ['Ingredient Name', 'Category', 'Linked Dishes'];
 
-    const addLabel = activeTab === 'dishes' ? 'Add Dish' : 'Add Ingredient';
+	const addLabel = activeTab === 'dishes' ? 'Add Dish' : 'Add Ingredient';
 	const tableRows = activeTab === 'dishes' ? dishesData : ingredientsData;
 	const categoryLabel = category || 'All Categories';
 
@@ -369,7 +370,7 @@ export default function Inventory() {
 	return (
 		<SafeAreaView style={styles.container}>
 			<StatusBar style="dark" />
-			<AuthHeader activeRoute="/Inventory" onChatPress={() => setIsChatOpen(true)} />
+			<AuthHeader activeRoute="/Inventory" />
 			<ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
 				<View style={styles.contentWrapper}>
 					<View style={styles.headerRow}>
@@ -567,7 +568,7 @@ export default function Inventory() {
 									value={dishName}
 									onChangeText={setDishName}
 								/>
-													{(modalType === 'dish' || modalType === 'edit-dish') && (
+								{(modalType === 'dish' || modalType === 'edit-dish') && (
 									<>
 										<Text style={styles.modalLabel}>Search ingredients</Text>
 										<TextInput
@@ -680,6 +681,8 @@ export default function Inventory() {
 					</View>
 				</View>
 			</Modal>
+
+			<FloatingChatButton />
 		</SafeAreaView>
 	);
 }

@@ -166,6 +166,25 @@ def login():
         app.logger.exception("/login failed with error")
         return jsonify({"error": str(e)}), 500
 
+
+@app.route("/users/me", methods=["GET"])
+@jwt_required()
+def get_user_profile():
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        org = Org.query.get(user.orgID) if user.orgID else None
+        return jsonify({
+            "orgName": org.orgName if org else None,
+            "role": user.uRole,
+            "email": user.email,
+        }), 200
+    except Exception as e:
+        app.logger.exception("/users/me failed")
+        return jsonify({"error": str(e)}), 500
+
 # Copy your login and dish routes here...
 
 # --- Inventory Routes ---

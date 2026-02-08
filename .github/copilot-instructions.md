@@ -37,8 +37,9 @@
   - `POST /inventory/ingredient-types`
 - Vendor pricing / order endpoints:
   - `GET /vendors/pricing` — simulated multi-vendor price comparisons per ingredient, with 7-day stock forecast.
-  - `POST /vendors/order` — place a simulated order (recorded in audit logs as `ORDER` action).
-- The Order page (`front-end/app/Order.tsx`) shows priority levels (P0–P3), vendor comparison cards, 7-day sparkline forecasts, and a sticky order bar.
+  - `POST /vendors/order` — places a real procurement order: creates stock batch rows (Ingredient + DishIngredient linked to `__STOCK__` dish), generates a PO number (`PO-YYYYMMDD-XXXX`), records audit log, and returns a full order receipt with `poNumber`, `placedAt`, `estimatedDelivery`, `lineItems[]`, `totalCost`, and `status`.
+  - `POST /vendors/order/export` — accepts order receipt JSON, returns a formal CSV purchase order document for download/sharing with vendors.
+- The Order page (`front-end/app/Order.tsx`) shows priority levels (P0–P3), vendor comparison cards, 7-day sparkline forecasts, per-item quantity customisation, an order review modal with line-item table, and a receipt modal with PO/batch details after placement. On confirm, a CSV PO sheet is auto-exported for sending to vendors.
 - Dashboard reorder suggestions link to the Order page via `?ingredient=<name>&urgency=<level>`.
 - The Gemini chatbot endpoint is `POST /chat` with `{ "message": "..." }`.
 - Audit logging: every mutating action (create, update, delete, login, import, export, consume, chat, order) is recorded in the `audit_logs` table via `record_audit()`.

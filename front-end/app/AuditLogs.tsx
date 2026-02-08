@@ -49,7 +49,7 @@ export default function AuditLogs() {
     const [actionFilter, setActionFilter] = useState('');
     const [resourceFilter, setResourceFilter] = useState('');
 
-    const ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGIN_FAILED', 'EXPORT', 'IMPORT', 'CONSUME', 'CHAT'];
+    const ACTIONS = ['CREATE', 'UPDATE', 'DELETE', 'LOGIN', 'LOGIN_FAILED', 'EXPORT', 'IMPORT', 'CONSUME', 'CHAT', 'ORDER'];
     const RESOURCES = ['auth', 'user', 'org', 'ingredient', 'dish', 'batch', 'stock', 'chat', 'settings'];
 
     useEffect(() => {

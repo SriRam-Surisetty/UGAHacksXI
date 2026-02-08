@@ -2,7 +2,12 @@ import axios from 'axios';
 import { Platform, Alert } from 'react-native';
 import { router } from 'expo-router';
 
+// Set EXPO_PUBLIC_API_URL in your env or .env to point at the deployed backend.
+// Falls back to local dev server when not set.
+const API_URL = process.env.EXPO_PUBLIC_API_URL;
+
 const getBaseUrl = () => {
+    if (API_URL) return API_URL;
     if (Platform.OS === 'android') {
         return 'http://10.0.2.2:5001';
     }

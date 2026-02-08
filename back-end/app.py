@@ -12,7 +12,7 @@ import re
 import logging
 import requests as http_requests
 from dotenv import load_dotenv
-from datetime import datetime
+from datetime import datetime, timedelta
 from decimal import Decimal, InvalidOperation
 
 load_dotenv()
@@ -37,19 +37,25 @@ _DB_HOST = os.getenv("DB_HOST", "db-mysql-nyc3-02019-do-user-33079250-0.j.db.ond
 _DB_PORT = os.getenv("DB_PORT", "25060")
 _DB_NAME = os.getenv("DB_NAME", "defaultdb")
 
-app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
-    "DATABASE_URL",
-    f"mysql+mysqlconnector://{_DB_USER}:{_DB_PASS}@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}"
-    f"?ssl_ca={CA_CERT_PATH}",
-)
+# Build the DB URI — use the CA cert file when present (local dev), else use
+# ssl_verify_cert=true which trusts the system CA store (works on App Platform).
+_db_base = f"mysql+mysqlconnector://{_DB_USER}:{_DB_PASS}@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}"
+if os.path.isfile(CA_CERT_PATH):
+    _db_uri = f"{_db_base}?ssl_ca={CA_CERT_PATH}"
+else:
+    _db_uri = f"{_db_base}?ssl_verify_cert=true"
+
+app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv("DATABASE_URL", _db_uri)
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secure-uga-hacks-key")
 
 db = SQLAlchemy(app)
 jwt = JWTManager(app)
+_cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:8081")
+_cors_origin_list = [o.strip() for o in _cors_origins.split(",") if o.strip()]
 CORS(
     app,
-    resources={r"/*": {"origins": ["http://localhost:8081"]}},
+    resources={r"/*": {"origins": _cors_origin_list}},
     supports_credentials=True,
     methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Content-Type", "Authorization"],
@@ -3109,54 +3115,236 @@ def vendors_pricing():
 @jwt_required()
 def vendors_place_order():
     """
-    Simulated order placement. Records the order in audit logs.
-    Body: { "items": [{ "ingName": "...", "vendorName": "...", "qty": 10, "unit": "lb", "totalCost": 25.50 }] }
+    Place a procurement order.  For each item the endpoint:
+      1. Looks up (or creates) the master ingredient row.
+      2. Creates a new stock-batch Ingredient row (with a system-generated
+         batchNum like "PO-20260208-0001") and links it to the __STOCK__ dish
+         with the ordered qty/unit.
+      3. Logs the action in audit_logs.
+    Returns a rich receipt with orderID, PO number, per-item details and ETA.
+
+    Body: {
+      "items": [
+        { "ingName": "...", "vendorName": "...", "qty": 10, "unit": "lb",
+          "unitPrice": 2.50, "totalCost": 25.00 }
+      ]
+    }
     """
     try:
-        user_id = int(get_jwt_identity())
-        user = db.session.get(User, user_id)
+        user = get_current_user()
         if not user:
-            return jsonify({"error": "User not found"}), 404
+            return jsonify({"error": "Unauthorized"}), 401
 
         body = request.get_json(force=True)
         items = body.get("items", [])
         if not items:
             return jsonify({"error": "No items provided"}), 400
 
+        org_id = user.orgID
+        settings = get_org_settings(org_id)
+        lead_time_days = settings.get("supplierLeadTimeDays", 3)
+
+        # Generate a unique PO number  (PO-YYYYMMDD-XXXX)
+        now = datetime.now()
+        today_str = now.strftime("%Y%m%d")
+        today_count = AuditLog.query.filter(
+            AuditLog.orgID == org_id,
+            AuditLog.action == "ORDER",
+            AuditLog.timestamp >= now.replace(hour=0, minute=0, second=0, microsecond=0),
+        ).count()
+        po_number = f"PO-{today_str}-{today_count + 1:04d}"
+
+        stock_dish = get_or_create_stock_dish(org_id)
+
         total_cost = 0.0
-        order_details = []
-        for item in items:
-            cost = float(item.get("totalCost", 0))
+        line_items = []
+
+        for idx, item in enumerate(items):
+            ing_name = (item.get("ingName") or "").strip()
+            vendor   = (item.get("vendorName") or "").strip()
+            qty_val  = float(item.get("qty", 0))
+            unit_val = (item.get("unit") or "each").strip()
+            unit_price = float(item.get("unitPrice", 0))
+            cost     = round(float(item.get("totalCost", qty_val * unit_price)), 2)
             total_cost += cost
-            order_details.append({
-                "ingredient": item.get("ingName"),
-                "vendor": item.get("vendorName"),
-                "qty": item.get("qty"),
-                "unit": item.get("unit"),
-                "cost": cost,
+
+            if qty_val <= 0 or not ing_name:
+                continue
+
+            # Find the master ingredient (no expiry, no batchNum)
+            master = Ingredient.query.filter(
+                Ingredient.orgID == org_id,
+                Ingredient.ingName == ing_name,
+                Ingredient.expiry.is_(None),
+                Ingredient.batchNum.is_(None),
+            ).first()
+
+            batch_num = f"{po_number}-{idx + 1:02d}"
+            estimated_delivery = (now + timedelta(days=lead_time_days)).date()
+
+            if master:
+                # Create a real stock batch tied to the master ingredient
+                new_batch = Ingredient(
+                    ingName=master.ingName,
+                    category=master.category,
+                    expiry=estimated_delivery + timedelta(days=90),  # Default 90-day shelf life
+                    batchNum=batch_num,
+                    orgID=org_id,
+                )
+                db.session.add(new_batch)
+                db.session.flush()
+
+                db.session.add(DishIngredient(
+                    dishID=stock_dish.dishID,
+                    ingID=new_batch.ingID,
+                    qty=Decimal(str(qty_val)),
+                    unit=unit_val,
+                ))
+                batch_id = new_batch.ingID
+            else:
+                batch_id = None  # Ingredient doesn't exist as master — still log it
+
+            line_items.append({
+                "lineNumber": idx + 1,
+                "ingredient": ing_name,
+                "vendor": vendor,
+                "qty": qty_val,
+                "unit": unit_val,
+                "unitPrice": unit_price,
+                "lineCost": cost,
+                "batchNum": batch_num,
+                "batchID": batch_id,
+                "estimatedDelivery": str(estimated_delivery),
             })
 
         record_audit(
-            user_id=user_id,
-            org_id=user.orgID,
             action="ORDER",
-            resource_type="ingredient",
+            resource_type="procurement",
             resource_id=None,
-            details=json.dumps({"orderItems": order_details, "totalCost": round(total_cost, 2)}),
+            details={
+                "poNumber": po_number,
+                "orderItems": line_items,
+                "totalCost": round(total_cost, 2),
+                "placedAt": now.isoformat(),
+                "estimatedDelivery": str((now + timedelta(days=lead_time_days)).date()),
+            },
+            user_id=user.userID,
+            org_id=org_id,
         )
+        db.session.commit()
 
         return jsonify({
-            "message": f"Order placed successfully for {len(items)} item(s)",
-            "totalCost": round(total_cost, 2),
-            "itemCount": len(items),
+            "message": f"Order placed successfully — {len(line_items)} line item(s)",
+            "order": {
+                "poNumber": po_number,
+                "placedAt": now.isoformat(),
+                "placedBy": user.email,
+                "estimatedDelivery": str((now + timedelta(days=lead_time_days)).date()),
+                "lineItems": line_items,
+                "totalCost": round(total_cost, 2),
+                "itemCount": len(line_items),
+                "status": "CONFIRMED",
+            },
         }), 201
 
     except Exception as e:
+        db.session.rollback()
         app.logger.exception("/vendors/order failed")
         return jsonify({"error": str(e)}), 500
 
 
+@app.route("/vendors/order/export", methods=["POST"])
+@jwt_required()
+def vendors_order_export_csv():
+    """
+    Generate a formal CSV Purchase Order document from order receipt data.
+    The front-end posts the receipt JSON back and receives a downloadable CSV.
+
+    Body: the `order` object returned by POST /vendors/order
+    """
+    try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
+        order = request.get_json(force=True)
+        if not order or not order.get("poNumber"):
+            return jsonify({"error": "Invalid order data"}), 400
+
+        org = db.session.get(Org, user.orgID)
+        org_name = org.orgName if org else "Organization"
+        org_email = org.org_email if org else ""
+
+        import io, csv
+        buf = io.StringIO()
+        w = csv.writer(buf)
+
+        # ---- PO Header ----
+        w.writerow(["PURCHASE ORDER"])
+        w.writerow([])
+        w.writerow(["PO Number", order["poNumber"]])
+        w.writerow(["Status", order.get("status", "CONFIRMED")])
+        w.writerow(["Date Placed", order.get("placedAt", "")])
+        w.writerow(["Estimated Delivery", order.get("estimatedDelivery", "")])
+        w.writerow(["Placed By", order.get("placedBy", user.email)])
+        w.writerow(["Organization", org_name])
+        if org_email:
+            w.writerow(["Contact Email", org_email])
+        w.writerow([])
+
+        # ---- Line Items Table ----
+        w.writerow(["LINE ITEMS"])
+        w.writerow(["#", "Ingredient", "Vendor", "Qty", "Unit",
+                     "Unit Price ($)", "Line Total ($)", "Batch Number",
+                     "Est. Delivery"])
+
+        for li in order.get("lineItems", []):
+            w.writerow([
+                li.get("lineNumber", ""),
+                li.get("ingredient", ""),
+                li.get("vendor", ""),
+                li.get("qty", ""),
+                li.get("unit", ""),
+                li.get("unitPrice", ""),
+                li.get("lineCost", ""),
+                li.get("batchNum", ""),
+                li.get("estimatedDelivery", ""),
+            ])
+
+        w.writerow([])
+        w.writerow(["", "", "", "", "", "ORDER TOTAL",
+                     f"${order.get('totalCost', 0):.2f}"])
+        w.writerow([])
+
+        # ---- Footer ----
+        w.writerow(["NOTES"])
+        w.writerow(["This purchase order was generated by StockSense."])
+        w.writerow([f"All prices are in USD. Delivery estimates are based on a {order.get('estimatedDelivery', 'N/A')} target."])
+        w.writerow(["Please confirm receipt of this PO and expected delivery date."])
+        w.writerow([])
+        w.writerow([f"Generated: {datetime.now().isoformat()}"])
+
+        csv_content = buf.getvalue()
+        buf.close()
+
+        from flask import Response
+        return Response(
+            csv_content,
+            mimetype="text/csv",
+            headers={
+                "Content-Disposition": f'attachment; filename="{order["poNumber"]}.csv"',
+            },
+        )
+
+    except Exception as e:
+        app.logger.exception("/vendors/order/export failed")
+        return jsonify({"error": str(e)}), 500
+
+
+# Ensure DB tables exist (safe to call repeatedly; no-op if tables already exist)
+with app.app_context():
+    db.create_all()
+
+
 if __name__ == '__main__':
-    with app.app_context():
-        db.create_all()
     app.run(host='0.0.0.0', port=5001, debug=True)

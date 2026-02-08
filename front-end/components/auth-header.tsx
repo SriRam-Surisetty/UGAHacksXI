@@ -3,6 +3,13 @@ import { useRouter } from 'expo-router';
 import { Colors } from '@/constants/theme';
 import { deleteToken, deleteUserId } from '@/services/storage';
 
+const fontFamilies = {
+    regular: 'IBMPlexSans_400Regular',
+    semiBold: 'IBMPlexSans_600SemiBold',
+    bold: 'IBMPlexSans_700Bold',
+    groteskBold: 'SpaceGrotesk_700Bold',
+};
+
 type AuthHeaderProps = {
     activeRoute?: string;
 };
@@ -67,7 +74,7 @@ const styles = StyleSheet.create({
         borderBottomColor: '#e5e7eb',
     },
     inner: {
-        paddingHorizontal: 20,
+        paddingHorizontal: 24,
         paddingVertical: 16,
         flexDirection: 'row',
         alignItems: 'center',
@@ -84,17 +91,20 @@ const styles = StyleSheet.create({
     },
     brand: {
         fontSize: 22,
+        fontFamily: fontFamilies.groteskBold,
         fontWeight: '700',
         color: Colors.landing.primaryPurple,
     },
     nav: {
         flexDirection: 'row',
         alignItems: 'center',
-        flexWrap: 'wrap',
+        fontFamily: fontFamilies.semiBold,
+        fontWeight: '600',
         gap: 20,
     },
     navText: {
-        fontSize: 14,
+        fontFamily: fontFamilies.bold,
+        fontWeight: '700',
         color: '#6b7280',
         fontWeight: '600',
     },
@@ -117,6 +127,7 @@ const styles = StyleSheet.create({
     userName: {
         fontSize: 14,
         color: '#6b7280',
+        fontFamily: fontFamilies.semiBold,
         fontWeight: '600',
     },
     avatar: {
@@ -129,6 +140,7 @@ const styles = StyleSheet.create({
     },
     avatarText: {
         color: Colors.landing.white,
+        fontFamily: fontFamilies.bold,
         fontWeight: '700',
         fontSize: 11,
     },
@@ -140,6 +152,7 @@ const styles = StyleSheet.create({
     },
     logoutText: {
         color: Colors.landing.white,
+        fontFamily: fontFamilies.semiBold,
         fontWeight: '600',
         fontSize: 14,
     },

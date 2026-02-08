@@ -1,4 +1,6 @@
 flask
 flask-cors
 flask-jwt-extended
+flask-sqlalchemy
+mysql-connector-python
 google-generativeai

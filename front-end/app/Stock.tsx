@@ -400,7 +400,7 @@ const styles = StyleSheet.create({
         backgroundColor: Colors.landing.white,
     },
     page: {
-        paddingVertical: 24,
+        paddingVertical: 32,
         paddingHorizontal: 24,
     },
     contentWrapper: {

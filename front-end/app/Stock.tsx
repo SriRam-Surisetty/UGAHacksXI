@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
     Modal,
     SafeAreaView,
@@ -13,6 +13,7 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import AuthHeader from '@/components/auth-header';
+import ChatWidget from '@/components/ChatWidget';
 
 type Batch = {
     id: number;
@@ -55,6 +56,7 @@ export default function Stock() {
     const [quantityInput, setQuantityInput] = useState('');
     const [wasteReason, setWasteReason] = useState('');
     const [statusPickerOpen, setStatusPickerOpen] = useState(false);
+    const [isChatOpen, setIsChatOpen] = useState(false);
 
     const today = useMemo(() => new Date(), []);
 
@@ -168,7 +170,7 @@ export default function Stock() {
     return (
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
-            <AuthHeader activeRoute="/Stock" />
+            <AuthHeader activeRoute="/Stock" onChatPress={() => setIsChatOpen(true)} />
 
             <ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
                 <View style={styles.contentWrapper}>
@@ -390,6 +392,9 @@ export default function Stock() {
                     </View>
                 </View>
             </Modal>
+
+            {/* Floating Chat Widget */}
+            <ChatWidget isOpen={isChatOpen} onClose={() => setIsChatOpen(false)} />
         </SafeAreaView>
     );
 }

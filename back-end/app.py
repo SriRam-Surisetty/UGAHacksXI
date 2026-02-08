@@ -179,6 +179,7 @@ def get_user_profile():
         return jsonify({
             "orgName": org.orgName if org else None,
             "role": user.uRole,
+            "email": user.email,
         }), 200
     except Exception as e:
         app.logger.exception("/users/me failed")

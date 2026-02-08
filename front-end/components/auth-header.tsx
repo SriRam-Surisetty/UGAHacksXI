@@ -28,6 +28,7 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
     const router = useRouter();
     const [orgName, setOrgName] = useState('Organization');
     const [roleName, setRoleName] = useState('User');
+    const [email, setEmail] = useState('');
 
     useEffect(() => {
         let isMounted = true;
@@ -64,11 +65,13 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
                 if (isMounted) {
                     setOrgName(response.data?.orgName || 'Organization');
                     setRoleName(response.data?.role || 'User');
+                    setEmail(response.data?.email || '');
                 }
             } catch (error) {
                 if (isMounted) {
                     setOrgName('Organization');
                     setRoleName('User');
+                    setEmail('');
                 }
             }
         };
@@ -114,7 +117,9 @@ export default function AuthHeader({ activeRoute }: AuthHeaderProps) {
                 <View style={styles.rightGroup}>
                     <View style={styles.userGroup}>
                         <Text style={styles.userName}>{orgName}</Text>
-                        <Text style={styles.roleName}>{roleName}</Text>
+                        <Text style={styles.roleName}>
+                            {email ? `${email} (${roleName})` : roleName}
+                        </Text>
                     </View>
                     <TouchableOpacity onPress={handleLogout} style={styles.logoutButton}>
                         <Text style={styles.logoutText}>Logout</Text>

@@ -65,7 +65,7 @@ export default function Support() {
 							</View>
 							<Text style={styles.contactTitle}>Email Support</Text>
 							<TouchableOpacity style={styles.ctaButton} onPress={handleViewPlans}>
-								<Text style={styles.ctaButtonText}>View plans</Text>
+								<Text style={styles.ctaButtonText}>stocksense@mailanator.com</Text>
 							</TouchableOpacity>
 						</View>
 
@@ -127,7 +127,7 @@ export default function Support() {
 
 				{/* Contact Form CTA */}
 				<View style={styles.ctaSection}>
-					<Text style={styles.ctaTitle}>Want more fetures?</Text>
+					<Text style={styles.ctaTitle}>Want more features?</Text>
 					<Text style={styles.ctaText}>Upgrade your plan today</Text>
 					<TouchableOpacity style={styles.ctaButton} onPress={handleViewPlans}>
 						<Text style={styles.ctaButtonText}>View plans</Text>

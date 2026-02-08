@@ -22,6 +22,8 @@ type Batch = {
     category?: string | null;
     batchNum?: string | null;
     expiry?: string | null;
+    qty?: number | null;
+    unit?: string | null;
 };
 
 type StatusFilter = 'all' | 'healthy' | 'expiring' | 'expired';
@@ -54,6 +56,8 @@ export default function Stock() {
     const [selectedBatch, setSelectedBatch] = useState<Batch | null>(null);
     const [batchNumInput, setBatchNumInput] = useState('');
     const [expiryInput, setExpiryInput] = useState('');
+    const [qtyInput, setQtyInput] = useState('');
+    const [unitInput, setUnitInput] = useState('');
     const [modalError, setModalError] = useState<string | null>(null);
     const [statusPickerOpen, setStatusPickerOpen] = useState(false);
     const [availableIngredients, setAvailableIngredients] = useState<IngredientOption[]>([]);
@@ -131,6 +135,8 @@ export default function Stock() {
         setSelectedBatch(batch ?? null);
         setBatchNumInput(batch?.batchNum ?? '');
         setExpiryInput(batch?.expiry ?? '');
+        setQtyInput(batch?.qty !== null && batch?.qty !== undefined ? String(batch.qty) : '');
+        setUnitInput(batch?.unit ?? '');
         setModalError(null);
         setSelectedIngredient(null);
         setIngredientSearch('');
@@ -144,6 +150,8 @@ export default function Stock() {
         setSelectedBatch(null);
         setBatchNumInput('');
         setExpiryInput('');
+        setQtyInput('');
+        setUnitInput('');
         setModalError(null);
         setSelectedIngredient(null);
     };
@@ -180,10 +188,16 @@ export default function Stock() {
                     setModalError('Provide a batch ID or expiry date.');
                     return;
                 }
+                if (!qtyInput.trim() || !unitInput.trim()) {
+                    setModalError('Provide quantity and unit.');
+                    return;
+                }
                 await api.post('/stock/batches', {
                     ingID: selectedIngredient.ingID,
                     batchNum,
                     expiry,
+                    qty: qtyInput.trim(),
+                    unit: unitInput.trim(),
                 });
             }
 
@@ -191,6 +205,8 @@ export default function Stock() {
                 await api.patch(`/stock/batches/${selectedBatch.id}`, {
                     batchNum: batchNumInput.trim() || null,
                     expiry: expiryInput.trim() || null,
+                    qty: qtyInput.trim() || null,
+                    unit: unitInput.trim() || null,
                 });
             }
 
@@ -221,12 +237,14 @@ export default function Stock() {
                 const response = await api.get('/stock/batches');
                 const serverBatches = response.data?.batches ?? [];
                 setBatches(
-                    serverBatches.map((batch: { ingID: number; ingName?: string; category?: string; batchNum?: string; expiry?: string }) => ({
+                    serverBatches.map((batch: { ingID: number; ingName?: string; category?: string; batchNum?: string; expiry?: string; qty?: number; unit?: string }) => ({
                         id: batch.ingID,
                         name: batch.ingName || '-',
                         category: batch.category ?? null,
                         batchNum: batch.batchNum ?? null,
                         expiry: batch.expiry ?? null,
+                        qty: typeof batch.qty === 'number' ? batch.qty : batch.qty ? Number(batch.qty) : null,
+                        unit: batch.unit ?? null,
                     }))
                 );
             } catch (fetchError) {
@@ -319,6 +337,10 @@ export default function Stock() {
                                 <Text style={styles.tableHeaderText}>Batch ID</Text>
                                 <Ionicons name="swap-vertical" size={12} color="#6b7280" />
                             </TouchableOpacity>
+                            <TouchableOpacity style={[styles.tableCell, styles.cellQuantity]} onPress={() => toggleSort('qty')}>
+                                <Text style={styles.tableHeaderText}>Quantity</Text>
+                                <Ionicons name="swap-vertical" size={12} color="#6b7280" />
+                            </TouchableOpacity>
                             <TouchableOpacity style={[styles.tableCell, styles.cellDate]} onPress={() => toggleSort('expiry')}>
                                 <Text style={styles.tableHeaderText}>Expires</Text>
                                 <Ionicons name="swap-vertical" size={12} color="#6b7280" />
@@ -365,6 +387,11 @@ export default function Stock() {
                                     <View style={[styles.tableCell, styles.cellBatch]}>
                                         <Text style={styles.cellMono}>{batch.batchNum || '-'}</Text>
                                     </View>
+                                    <View style={[styles.tableCell, styles.cellQuantity]}>
+                                        <Text style={styles.cellPrimary}>
+                                            {batch.qty ?? '-'} {batch.unit || ''}
+                                        </Text>
+                                    </View>
                                     <View style={[styles.tableCell, styles.cellDate]}>
                                         <Text style={styles.cellSecondary}>{batch.expiry || '-'}</Text>
                                     </View>
@@ -408,6 +435,21 @@ export default function Stock() {
                                     placeholder="e.g. BTH-001-2024"
                                     value={batchNumInput}
                                     onChangeText={setBatchNumInput}
+                                />
+                                <Text style={styles.modalLabel}>Quantity</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="0"
+                                    keyboardType="numeric"
+                                    value={qtyInput}
+                                    onChangeText={setQtyInput}
+                                />
+                                <Text style={styles.modalLabel}>Unit</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="kg, lb, L"
+                                    value={unitInput}
+                                    onChangeText={setUnitInput}
                                 />
                                 <Text style={styles.modalLabel}>Expiry date (YYYY-MM-DD)</Text>
                                 <TextInput
@@ -457,6 +499,21 @@ export default function Stock() {
                                     placeholder="e.g. BTH-001-2024"
                                     value={batchNumInput}
                                     onChangeText={setBatchNumInput}
+                                />
+                                <Text style={styles.modalLabel}>Quantity</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="0"
+                                    keyboardType="numeric"
+                                    value={qtyInput}
+                                    onChangeText={setQtyInput}
+                                />
+                                <Text style={styles.modalLabel}>Unit</Text>
+                                <TextInput
+                                    style={styles.modalInput}
+                                    placeholder="kg, lb, L"
+                                    value={unitInput}
+                                    onChangeText={setUnitInput}
                                 />
                                 <Text style={styles.modalLabel}>Expiry date (YYYY-MM-DD)</Text>
                                 <TextInput
@@ -688,6 +745,10 @@ const styles = StyleSheet.create({
     },
     cellBatch: {
         flex: 1.6,
+    },
+    cellQuantity: {
+        flex: 1.3,
+        justifyContent: 'flex-end',
     },
     cellDate: {
         flex: 1.4,

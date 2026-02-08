@@ -1,13 +1,14 @@
 from flask import Flask, jsonify, request
 from flask_cors import CORS
 from flask_sqlalchemy import SQLAlchemy
-from sqlalchemy import func, or_
+from sqlalchemy import func, or_, and_
 from flask_jwt_extended import create_access_token, get_jwt_identity, jwt_required, JWTManager
 from werkzeug.security import generate_password_hash, check_password_hash
 import os
 import logging
 from dotenv import load_dotenv
 from datetime import datetime
+from decimal import Decimal, InvalidOperation
 
 load_dotenv()
 
@@ -119,6 +120,31 @@ def parse_date(value, field_name):
         except ValueError as exc:
             raise ValueError(f"{field_name} must be YYYY-MM-DD") from exc
     raise ValueError(f"{field_name} must be a string")
+
+
+def parse_quantity(value, field_name):
+    if value is None:
+        return None
+    try:
+        return Decimal(str(value))
+    except (InvalidOperation, ValueError) as exc:
+        raise ValueError(f"{field_name} must be numeric") from exc
+
+
+STOCK_DISH_NAME = "__STOCK__"
+
+
+def get_or_create_stock_dish(org_id):
+    stock_dish = Dish.query.filter(
+        Dish.orgID == org_id,
+        Dish.dishName == STOCK_DISH_NAME,
+    ).first()
+    if stock_dish:
+        return stock_dish
+    stock_dish = Dish(dishName=STOCK_DISH_NAME, orgID=org_id)
+    db.session.add(stock_dish)
+    db.session.flush()
+    return stock_dish
 
 # --- Auth Routes ---
 
@@ -333,7 +359,10 @@ def list_dishes():
             return jsonify({"error": "Unauthorized"}), 401
 
         search = request.args.get("search", "").strip()
-        query = Dish.query.filter(Dish.orgID == user.orgID)
+        query = Dish.query.filter(
+            Dish.orgID == user.orgID,
+            Dish.dishName != STOCK_DISH_NAME,
+        )
 
         if search:
             query = query.filter(Dish.dishName.ilike(f"%{search}%"))
@@ -467,6 +496,8 @@ def create_dish():
         dish_name = data.get("dishName")
         if not dish_name:
             return jsonify({"error": "Missing dishName"}), 400
+        if dish_name == STOCK_DISH_NAME:
+            return jsonify({"error": "Dish name is reserved"}), 400
 
         ingredients = data.get("ingredients", [])
         if not isinstance(ingredients, list):
@@ -590,6 +621,8 @@ def update_or_delete_dish(dish_id):
         if dish_name is not None:
             if not dish_name:
                 return jsonify({"error": "dishName cannot be empty"}), 400
+            if dish_name == STOCK_DISH_NAME:
+                return jsonify({"error": "Dish name is reserved"}), 400
             dish.dishName = dish_name
 
         if ingredients is not None:
@@ -642,6 +675,12 @@ def list_stock_batches():
         if not user:
             return jsonify({"error": "Unauthorized"}), 401
 
+        stock_dish = Dish.query.filter(
+            Dish.orgID == user.orgID,
+            Dish.dishName == STOCK_DISH_NAME,
+        ).first()
+        stock_dish_id = stock_dish.dishID if stock_dish else None
+
         search = request.args.get("search", "").strip()
         query = Ingredient.query.filter(
             Ingredient.orgID == user.orgID,
@@ -662,6 +701,21 @@ def list_stock_batches():
             Ingredient.ingName.asc(),
         ).all()
 
+        qty_map = {}
+        if stock_dish_id and batches:
+            ing_ids = [batch.ingID for batch in batches]
+            qty_rows = DishIngredient.query.filter(
+                DishIngredient.dishID == stock_dish_id,
+                DishIngredient.ingID.in_(ing_ids),
+            ).all()
+            qty_map = {
+                row.ingID: {
+                    "qty": float(row.qty) if row.qty is not None else None,
+                    "unit": row.unit,
+                }
+                for row in qty_rows
+            }
+
         return jsonify({
             "batches": [
                 {
@@ -670,6 +724,8 @@ def list_stock_batches():
                     "category": batch.category,
                     "expiry": batch.expiry.isoformat() if batch.expiry else None,
                     "batchNum": batch.batchNum,
+                    "qty": qty_map.get(batch.ingID, {}).get("qty"),
+                    "unit": qty_map.get(batch.ingID, {}).get("unit"),
                 }
                 for batch in batches
             ]
@@ -717,6 +773,18 @@ def create_stock_batch():
         if not expiry and not batch_num:
             return jsonify({"error": "Batch requires expiry or batchNum"}), 400
 
+        qty_value = data.get("qty")
+        unit_value = data.get("unit")
+        if qty_value is None or unit_value is None:
+            return jsonify({"error": "Batch requires qty and unit"}), 400
+        try:
+            qty = parse_quantity(qty_value, "qty")
+        except ValueError as exc:
+            return jsonify({"error": str(exc)}), 400
+        if not isinstance(unit_value, str) or not unit_value.strip():
+            return jsonify({"error": "unit is required"}), 400
+        unit = unit_value.strip()
+
         new_batch = Ingredient(
             ingName=master.ingName,
             category=master.category,
@@ -725,6 +793,16 @@ def create_stock_batch():
             orgID=user.orgID,
         )
         db.session.add(new_batch)
+        db.session.flush()
+
+        stock_dish = get_or_create_stock_dish(user.orgID)
+        db.session.add(DishIngredient(
+            dishID=stock_dish.dishID,
+            ingID=new_batch.ingID,
+            qty=qty,
+            unit=unit,
+        ))
+
         db.session.commit()
 
         return jsonify({
@@ -735,6 +813,8 @@ def create_stock_batch():
                 "category": new_batch.category,
                 "expiry": new_batch.expiry.isoformat() if new_batch.expiry else None,
                 "batchNum": new_batch.batchNum,
+                "qty": float(qty) if qty is not None else None,
+                "unit": unit,
             },
         }), 201
     except Exception as e:
@@ -760,7 +840,17 @@ def update_or_delete_stock_batch(ing_id):
         if not batch:
             return jsonify({"error": "Batch not found"}), 404
 
+        stock_dish = Dish.query.filter(
+            Dish.orgID == user.orgID,
+            Dish.dishName == STOCK_DISH_NAME,
+        ).first()
+
         if request.method == "DELETE":
+            if stock_dish:
+                DishIngredient.query.filter(
+                    DishIngredient.dishID == stock_dish.dishID,
+                    DishIngredient.ingID == batch.ingID,
+                ).delete()
             db.session.delete(batch)
             db.session.commit()
             return jsonify({"msg": "Batch deleted"}), 200
@@ -781,8 +871,42 @@ def update_or_delete_stock_batch(ing_id):
                 batch_num = batch_num.strip()
             batch.batchNum = batch_num or None
 
+        qty = None
+        unit = None
+        link = None
+        if "qty" in data:
+            try:
+                qty = parse_quantity(data.get("qty"), "qty")
+            except ValueError as exc:
+                return jsonify({"error": str(exc)}), 400
+
+        if "unit" in data:
+            unit_value = data.get("unit")
+            if unit_value is not None and (not isinstance(unit_value, str) or not unit_value.strip()):
+                return jsonify({"error": "unit is required"}), 400
+            unit = unit_value.strip() if isinstance(unit_value, str) else None
+
         if not batch.expiry and not batch.batchNum:
             return jsonify({"error": "Batch requires expiry or batchNum"}), 400
+
+        if qty is not None or unit is not None:
+            stock_dish = stock_dish or get_or_create_stock_dish(user.orgID)
+            link = DishIngredient.query.filter(
+                DishIngredient.dishID == stock_dish.dishID,
+                DishIngredient.ingID == batch.ingID,
+            ).first()
+            if not link:
+                link = DishIngredient(dishID=stock_dish.dishID, ingID=batch.ingID)
+                db.session.add(link)
+            if qty is not None:
+                link.qty = qty
+            if unit is not None:
+                link.unit = unit
+        elif stock_dish:
+            link = DishIngredient.query.filter(
+                DishIngredient.dishID == stock_dish.dishID,
+                DishIngredient.ingID == batch.ingID,
+            ).first()
 
         db.session.commit()
         return jsonify({
@@ -793,6 +917,8 @@ def update_or_delete_stock_batch(ing_id):
                 "category": batch.category,
                 "expiry": batch.expiry.isoformat() if batch.expiry else None,
                 "batchNum": batch.batchNum,
+                "qty": float(link.qty) if link and link.qty is not None else None,
+                "unit": link.unit if link else None,
             },
         }), 200
     except Exception as e:

@@ -1061,12 +1061,223 @@ def consume_stock_for_dish():
         app.logger.exception("/stock/consume failed")
         return jsonify({"error": str(e)}), 500
 
-# --- Gemini Chatbot Route ---
+# --- Gemini Agentic Chatbot Route ---
 import google.generativeai as genai
+from sqlalchemy import text as sql_text
+import json
+import re
+
+# Dangerous SQL patterns that should never be allowed
+BLOCKED_SQL_PATTERNS = [
+    r"\bDROP\s+DATABASE\b",
+    r"\bDROP\s+TABLE\s+(?!dish_ing|dishes|ing|orgs|users)",  # only allow known tables
+    r"\bTRUNCATE\b",
+    r"\bALTER\s+TABLE\b",
+    r"\bCREATE\s+TABLE\b",
+    r"\bGRANT\b",
+    r"\bREVOKE\b",
+    r"\bSHOW\s+VARIABLES\b",
+    r"\bLOAD\s+DATA\b",
+    r"\bINTO\s+OUTFILE\b",
+    r"\bINTO\s+DUMPFILE\b",
+]
+
+WRITE_SQL_PATTERNS = [
+    r"\bINSERT\b",
+    r"\bUPDATE\b",
+    r"\bDELETE\b",
+    r"\bREPLACE\b",
+]
+
+DB_SCHEMA_DESCRIPTION = """
+Database schema (MySQL):
+
+TABLE orgs:
+  - orgID INT PRIMARY KEY AUTO_INCREMENT
+  - orgName VARCHAR(100) NOT NULL
+  - latCoord DECIMAL(10,8)
+  - longCoord DECIMAL(11,8)
+  - org_email VARCHAR(100)
+
+TABLE users:
+  - userID INT PRIMARY KEY AUTO_INCREMENT
+  - email VARCHAR(100) UNIQUE
+  - hashed_pwd VARCHAR(255) NOT NULL  (NEVER expose or query this column)
+  - uRole VARCHAR(20)   -- 'admin' or 'manager'
+  - orgID INT FK -> orgs.orgID
+
+TABLE dishes:
+  - dishID INT PRIMARY KEY AUTO_INCREMENT
+  - dishName VARCHAR(100) NOT NULL
+  - orgID INT FK -> orgs.orgID
+  Note: Dishes with dishName='__STOCK__' are internal system records for stock tracking.
+
+TABLE ing (ingredients):
+  - ingID INT PRIMARY KEY AUTO_INCREMENT
+  - ingName VARCHAR(100) NOT NULL
+  - category VARCHAR(50)
+  - expiry DATE          -- NULL for master ingredient types; set for stock batches
+  - batchNum VARCHAR(50) -- NULL for master ingredient types; set for stock batches
+  - orgID INT FK -> orgs.orgID
+  Note: Rows with expiry=NULL AND batchNum=NULL are "master ingredient types" (templates).
+        Rows with expiry OR batchNum set are stock batches.
+
+TABLE dish_ing (recipe links & stock quantities):
+  - dishID INT FK -> dishes.dishID (PK part 1)
+  - ingID INT FK -> ing.ingID (PK part 2)
+  - qty DECIMAL(10,2)
+  - unit VARCHAR(20)
+  Note: Links ingredients to dishes (recipes). Also used with the __STOCK__ dish to track batch quantities.
+"""
+
+
+def build_system_prompt(org_name, org_email, user_email, user_role, org_id):
+    return f"""You are **StockSense AI**, the intelligent assistant for the StockSense inventory management platform.
+
+## About StockSense
+StockSense is a restaurant / food-service inventory management system that helps organizations track:
+- **Ingredient types** (master list of ingredients used by the org)
+- **Dishes / recipes** (with linked ingredients and quantities)
+- **Stock batches** (physical inventory with expiry dates, batch numbers, and quantities)
+- **Stock consumption** (deducting ingredients when dishes are cooked)
+
+## Current Context
+- Organization: **{org_name}** (ID: {org_id}, email: {org_email or 'N/A'})
+- Current user: **{user_email}** (role: {user_role})
+
+## Your Capabilities
+1. **Answer questions** about the organization's inventory, dishes, ingredients, stock levels, and users.
+2. **Run SQL queries** against the database to look up information. Use the `run_sql_query` function.
+3. **Modify data** when the user explicitly asks you to add, update, or delete records. Use the `run_sql_write` function.
+4. **Provide insights** — e.g. expiring ingredients, low stock alerts, recipe cost estimates, usage patterns.
+
+## Rules
+- ALWAYS filter queries by orgID = {org_id} so you never leak data from other organizations.
+- NEVER select, return, or expose the `hashed_pwd` column from the users table.
+- NEVER run DROP DATABASE, TRUNCATE, ALTER TABLE, or other destructive DDL.
+- When modifying data, confirm what you're about to do before executing, unless the user's intent is very clear.
+- For INSERT/UPDATE/DELETE, always respect foreign key constraints and required fields.
+- Keep responses concise, friendly, and helpful. Use markdown formatting for readability.
+- If a query returns no results, say so clearly.
+- When showing tabular data, use markdown tables.
+- You can run multiple queries in sequence to answer complex questions — do so proactively.
+
+{DB_SCHEMA_DESCRIPTION}
+"""
+
+
+def validate_sql(query_str, allow_writes=False, org_id=None):
+    """Validate a SQL query for safety. Returns (is_safe, reason)."""
+    normalized = query_str.strip().upper()
+
+    # Block dangerous patterns
+    for pattern in BLOCKED_SQL_PATTERNS:
+        if re.search(pattern, normalized, re.IGNORECASE):
+            return False, f"Blocked: query matches dangerous pattern"
+
+    # Check for write operations
+    is_write = any(re.search(p, normalized, re.IGNORECASE) for p in WRITE_SQL_PATTERNS)
+    if is_write and not allow_writes:
+        return False, "Write operations not allowed in read-only mode. Use run_sql_write instead."
+
+    # Ensure org_id filter is present (basic check)
+    if org_id is not None and str(org_id) not in query_str:
+        return False, f"Query must filter by orgID = {org_id} for data isolation."
+
+    return True, "OK"
+
+
+def execute_sql_query(query_str, org_id, allow_writes=False):
+    """Execute a SQL query and return results as a list of dicts."""
+    is_safe, reason = validate_sql(query_str, allow_writes=allow_writes, org_id=org_id)
+    if not is_safe:
+        return {"error": reason}
+
+    try:
+        result = db.session.execute(sql_text(query_str))
+
+        if allow_writes:
+            db.session.commit()
+            return {"success": True, "rows_affected": result.rowcount}
+
+        # For SELECT queries
+        if result.returns_rows:
+            columns = list(result.keys())
+            rows = []
+            for row in result.fetchall():
+                row_dict = {}
+                for i, col in enumerate(columns):
+                    val = row[i]
+                    # Convert non-serializable types
+                    if isinstance(val, Decimal):
+                        val = float(val)
+                    elif isinstance(val, (datetime,)):
+                        val = val.isoformat()
+                    elif hasattr(val, 'isoformat'):
+                        val = val.isoformat()
+                    row_dict[col] = val
+                rows.append(row_dict)
+            return {"columns": columns, "rows": rows, "row_count": len(rows)}
+        else:
+            db.session.commit()
+            return {"success": True, "rows_affected": result.rowcount}
+
+    except Exception as e:
+        db.session.rollback()
+        return {"error": str(e)}
+
+
+# Define Gemini function declarations for the agentic chatbot
+sql_read_tool = genai.protos.Tool(
+    function_declarations=[
+        genai.protos.FunctionDeclaration(
+            name="run_sql_query",
+            description="Execute a read-only SQL SELECT query against the database to retrieve information. Always include WHERE orgID = <org_id> to filter by the current organization. Never select hashed_pwd.",
+            parameters=genai.protos.Schema(
+                type=genai.protos.Type.OBJECT,
+                properties={
+                    "query": genai.protos.Schema(
+                        type=genai.protos.Type.STRING,
+                        description="The SQL SELECT query to execute. Must include orgID filter.",
+                    ),
+                    "purpose": genai.protos.Schema(
+                        type=genai.protos.Type.STRING,
+                        description="Brief explanation of what this query is looking up.",
+                    ),
+                },
+                required=["query", "purpose"],
+            ),
+        ),
+        genai.protos.FunctionDeclaration(
+            name="run_sql_write",
+            description="Execute a SQL INSERT, UPDATE, or DELETE query to modify data in the database. Only use when the user explicitly asks to add, change, or remove data. Always include WHERE orgID = <org_id> for UPDATE/DELETE. For INSERT, set orgID to the current org.",
+            parameters=genai.protos.Schema(
+                type=genai.protos.Type.OBJECT,
+                properties={
+                    "query": genai.protos.Schema(
+                        type=genai.protos.Type.STRING,
+                        description="The SQL INSERT/UPDATE/DELETE query to execute. Must respect orgID.",
+                    ),
+                    "purpose": genai.protos.Schema(
+                        type=genai.protos.Type.STRING,
+                        description="Brief explanation of what this modification does.",
+                    ),
+                },
+                required=["query", "purpose"],
+            ),
+        ),
+    ]
+)
+
 
 @app.route("/chat", methods=["POST"])
-def chat():
+@jwt_required()
+def chat_endpoint():
     try:
+        user = get_current_user()
+        if not user:
+            return jsonify({"error": "Unauthorized"}), 401
+
         data = request.get_json(silent=True)
         if not data:
             return jsonify({"error": "Missing JSON body"}), 400
@@ -1075,19 +1286,157 @@ def chat():
         if not message:
             return jsonify({"error": "Missing message field"}), 400
 
+        # Get conversation history from client (list of {role, text} dicts)
+        history_raw = data.get("history", [])
+
         api_key = os.getenv("GEMINI_API_KEY")
         if not api_key:
             app.logger.error("GEMINI_API_KEY is not set")
             return jsonify({"error": "Server configuration error: API key missing"}), 500
 
+        # Build context
+        org = Org.query.get(user.orgID) if user.orgID else None
+        org_name = org.orgName if org else "Unknown"
+        org_email = org.org_email if org else None
+        org_id = user.orgID
+
+        system_prompt = build_system_prompt(
+            org_name=org_name,
+            org_email=org_email,
+            user_email=user.email,
+            user_role=user.uRole,
+            org_id=org_id,
+        )
+
         genai.configure(api_key=api_key)
-        # Using gemini-flash-latest as verified in previous steps
-        model = genai.GenerativeModel('gemini-flash-latest')
-        
-        chat = model.start_chat(history=[])
-        response = chat.send_message(message)
-        
-        return jsonify({"response": response.text}), 200
+
+        # Models to try in priority order; falls back on rate-limit errors
+        GEMINI_MODELS = [
+            'gemini-2.5-flash-lite',
+            'gemini-3-flash-preview',
+            'gemini-2.5-flash',
+        ]
+
+        # Build Gemini conversation history
+        gemini_history = []
+        for entry in history_raw:
+            role = entry.get("role", "user")
+            text = entry.get("text", "")
+            if role in ("user", "model") and text:
+                gemini_history.append({"role": role, "parts": [text]})
+
+        last_error = None
+        for model_name in GEMINI_MODELS:
+            try:
+                app.logger.info(f"Trying Gemini model: {model_name}")
+                model = genai.GenerativeModel(
+                    model_name,
+                    tools=[sql_read_tool],
+                    system_instruction=system_prompt,
+                )
+
+                chat_session = model.start_chat(history=gemini_history)
+
+                # Send the user message and handle function calling loop
+                response = chat_session.send_message(message)
+
+                # Agentic loop: keep processing function calls until we get a text response
+                max_iterations = 10
+                iteration = 0
+                actions_taken = []
+
+                while iteration < max_iterations:
+                    iteration += 1
+
+                    # Check if there are function calls in the response
+                    function_calls = []
+                    for candidate in response.candidates:
+                        for part in candidate.content.parts:
+                            if part.function_call:
+                                function_calls.append(part.function_call)
+
+                    if not function_calls:
+                        break  # No more function calls, we have the final text response
+
+                    # Process each function call
+                    function_responses = []
+                    for fc in function_calls:
+                        fn_name = fc.name
+                        fn_args = dict(fc.args) if fc.args else {}
+
+                        app.logger.info(f"AI function call: {fn_name}({fn_args})")
+
+                        if fn_name == "run_sql_query":
+                            query = fn_args.get("query", "")
+                            purpose = fn_args.get("purpose", "")
+                            result = execute_sql_query(query, org_id=org_id, allow_writes=False)
+                            actions_taken.append({"action": "query", "purpose": purpose, "query": query})
+                            function_responses.append(
+                                genai.protos.Part(
+                                    function_response=genai.protos.FunctionResponse(
+                                        name="run_sql_query",
+                                        response={"result": json.dumps(result, default=str)},
+                                    )
+                                )
+                            )
+
+                        elif fn_name == "run_sql_write":
+                            query = fn_args.get("query", "")
+                            purpose = fn_args.get("purpose", "")
+                            result = execute_sql_query(query, org_id=org_id, allow_writes=True)
+                            actions_taken.append({"action": "write", "purpose": purpose, "query": query})
+                            function_responses.append(
+                                genai.protos.Part(
+                                    function_response=genai.protos.FunctionResponse(
+                                        name="run_sql_write",
+                                        response={"result": json.dumps(result, default=str)},
+                                    )
+                                )
+                            )
+
+                        else:
+                            function_responses.append(
+                                genai.protos.Part(
+                                    function_response=genai.protos.FunctionResponse(
+                                        name=fn_name,
+                                        response={"error": f"Unknown function: {fn_name}"},
+                                    )
+                                )
+                            )
+
+                    # Send all function responses back to the model
+                    response = chat_session.send_message(function_responses)
+
+                # Extract final text
+                final_text = ""
+                for candidate in response.candidates:
+                    for part in candidate.content.parts:
+                        if part.text:
+                            final_text += part.text
+
+                if not final_text:
+                    final_text = "I processed your request but couldn't generate a text response."
+
+                app.logger.info(f"Chat succeeded with model: {model_name}")
+                return jsonify({
+                    "response": final_text,
+                    "actions": actions_taken,
+                }), 200
+
+            except Exception as model_err:
+                err_str = str(model_err)
+                # If it's a rate-limit (429) or quota error, try next model
+                if "429" in err_str or "quota" in err_str.lower() or "rate" in err_str.lower() or "ResourceExhausted" in err_str:
+                    app.logger.warning(f"Model {model_name} rate-limited, trying next: {err_str[:200]}")
+                    last_error = model_err
+                    continue
+                else:
+                    # Non-rate-limit error — raise immediately
+                    raise model_err
+
+        # All models exhausted
+        app.logger.error("All Gemini models rate-limited")
+        return jsonify({"error": f"All AI models are currently rate-limited. Please try again in a minute. Last error: {str(last_error)[:200]}"}), 429
 
     except Exception as e:
         app.logger.exception("/chat failed with error")

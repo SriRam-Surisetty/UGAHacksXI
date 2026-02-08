@@ -16,14 +16,22 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import Markdown from 'react-native-markdown-display';
 import { Colors } from '@/constants/theme';
+import api from '@/services/api';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+interface ChatAction {
+    action: string;
+    purpose: string;
+    query: string;
+}
 
 interface Message {
     id: string;
     text: string;
     isUser: boolean;
     timestamp: Date;
+    actions?: ChatAction[];
 }
 
 interface ChatWidgetProps {
@@ -80,60 +88,129 @@ function TypingIndicator() {
     );
 }
 
-const CHAT_HISTORY_KEY = 'stocksense_chat_history';
+const CHAT_TABS_KEY = 'stocksense_chat_tabs';
+const CHAT_NEXT_ID_KEY = 'stocksense_chat_next_id';
+
+const DEFAULT_GREETING: Message = {
+    id: 'greeting',
+    text: "Hi! I'm **StockSense AI**. I can help you manage your inventory, look up dishes, check stock levels, and more. Just ask!",
+    isUser: false,
+    timestamp: new Date(),
+};
+
+interface ChatTab {
+    id: number;
+    label: string;
+    messages: Message[];
+}
+
+function createTab(id: number): ChatTab {
+    return {
+        id,
+        label: `Tab ${id}`,
+        messages: [{ ...DEFAULT_GREETING, timestamp: new Date() }],
+    };
+}
 
 export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
-    const [messages, setMessages] = useState<Message[]>([
-        {
-            id: '1',
-            text: "Hi! I'm your AI assistant. How can I help you today?",
-            isUser: false,
-            timestamp: new Date(),
-        },
-    ]);
+    const [tabs, setTabs] = useState<ChatTab[]>([createTab(1)]);
+    const [activeTabId, setActiveTabId] = useState(1);
+    const [nextTabId, setNextTabId] = useState(2);
     const [inputText, setInputText] = useState('');
     const [isLoading, setIsLoading] = useState(false);
     const scrollViewRef = useRef<ScrollView>(null);
     const fadeAnim = useRef(new Animated.Value(0)).current;
     const scaleAnim = useRef(new Animated.Value(0.9)).current;
+    const tabScrollRef = useRef<ScrollView>(null);
 
     // Check platform at render time, not module load time
     const isWeb = Platform.OS === 'web';
     const isLargeScreen = SCREEN_WIDTH > 768;
 
-    // Load chat history on mount
+    // Load chat tabs on mount
     useEffect(() => {
-        loadChatHistory();
+        loadChatTabs();
     }, []);
 
-    // Save chat history whenever messages change
+    // Save chat tabs whenever they change
     useEffect(() => {
-        saveChatHistory();
-    }, [messages]);
+        saveChatTabs();
+    }, [tabs, nextTabId]);
 
-    const loadChatHistory = async () => {
+    const activeTab = tabs.find(t => t.id === activeTabId) || tabs[0];
+    const messages = activeTab?.messages || [];
+
+    const loadChatTabs = async () => {
         try {
-            const saved = await AsyncStorage.getItem(CHAT_HISTORY_KEY);
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                // Convert timestamp strings back to Date objects
-                const messagesWithDates = parsed.map((msg: any) => ({
-                    ...msg,
-                    timestamp: new Date(msg.timestamp),
+            const [savedTabs, savedNextId] = await Promise.all([
+                AsyncStorage.getItem(CHAT_TABS_KEY),
+                AsyncStorage.getItem(CHAT_NEXT_ID_KEY),
+            ]);
+            if (savedTabs) {
+                const parsed: ChatTab[] = JSON.parse(savedTabs);
+                const restored = parsed.map(tab => ({
+                    ...tab,
+                    messages: tab.messages.map((msg: any) => ({
+                        ...msg,
+                        timestamp: new Date(msg.timestamp),
+                    })),
                 }));
-                setMessages(messagesWithDates);
+                if (restored.length > 0) {
+                    setTabs(restored);
+                    setActiveTabId(restored[restored.length - 1].id);
+                }
+            }
+            if (savedNextId) {
+                setNextTabId(JSON.parse(savedNextId));
             }
         } catch (error) {
-            console.error('Failed to load chat history:', error);
+            console.error('Failed to load chat tabs:', error);
         }
     };
 
-    const saveChatHistory = async () => {
+    const saveChatTabs = async () => {
         try {
-            await AsyncStorage.setItem(CHAT_HISTORY_KEY, JSON.stringify(messages));
+            await Promise.all([
+                AsyncStorage.setItem(CHAT_TABS_KEY, JSON.stringify(tabs)),
+                AsyncStorage.setItem(CHAT_NEXT_ID_KEY, JSON.stringify(nextTabId)),
+            ]);
         } catch (error) {
-            console.error('Failed to save chat history:', error);
+            console.error('Failed to save chat tabs:', error);
         }
+    };
+
+    const addNewTab = () => {
+        const newTab = createTab(nextTabId);
+        setTabs(prev => [...prev, newTab]);
+        setActiveTabId(nextTabId);
+        setNextTabId(prev => prev + 1);
+        setInputText('');
+        setTimeout(() => tabScrollRef.current?.scrollToEnd({ animated: true }), 100);
+    };
+
+    const closeTab = (tabId: number) => {
+        setTabs(prev => {
+            const remaining = prev.filter(t => t.id !== tabId);
+            if (remaining.length === 0) {
+                // Always keep at least one tab
+                const fresh = createTab(nextTabId);
+                setNextTabId(n => n + 1);
+                setActiveTabId(fresh.id);
+                return [fresh];
+            }
+            if (activeTabId === tabId) {
+                setActiveTabId(remaining[remaining.length - 1].id);
+            }
+            return remaining;
+        });
+    };
+
+    const updateActiveMessages = (updater: (prev: Message[]) => Message[]) => {
+        setTabs(prev => prev.map(tab =>
+            tab.id === activeTabId
+                ? { ...tab, messages: updater(tab.messages) }
+                : tab
+        ));
     };
 
     useEffect(() => {
@@ -177,37 +254,46 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
             timestamp: new Date(),
         };
 
-        setMessages(prev => [...prev, userMessage]);
+        updateActiveMessages(prev => [...prev, userMessage]);
         setInputText('');
         setIsLoading(true);
 
         setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
 
         try {
-            const response = await fetch('http://172.21.218.223:5001/chat', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ message: userMessage.text }),
+            // Build conversation history for context (excluding the greeting)
+            const history = messages
+                .filter(m => m.id !== 'greeting')
+                .map(m => ({
+                    role: m.isUser ? 'user' : 'model',
+                    text: m.text,
+                }));
+
+            const response = await api.post('/chat', {
+                message: userMessage.text,
+                history,
             });
 
-            const data = await response.json();
+            const data = response.data;
 
             const aiMessage: Message = {
                 id: (Date.now() + 1).toString(),
                 text: data.response || "I'm sorry, I couldn't process that.",
                 isUser: false,
                 timestamp: new Date(),
+                actions: data.actions && data.actions.length > 0 ? data.actions : undefined,
             };
 
-            setMessages(prev => [...prev, aiMessage]);
-        } catch (error) {
+            updateActiveMessages(prev => [...prev, aiMessage]);
+        } catch (error: any) {
+            const errText = error?.response?.data?.error || 'Connection error. Please try again.';
             const errorMessage: Message = {
                 id: (Date.now() + 1).toString(),
-                text: 'Connection error. Please try again.',
+                text: errText,
                 isUser: false,
                 timestamp: new Date(),
             };
-            setMessages(prev => [...prev, errorMessage]);
+            updateActiveMessages(prev => [...prev, errorMessage]);
         } finally {
             setIsLoading(false);
             setTimeout(() => scrollViewRef.current?.scrollToEnd({ animated: true }), 100);
@@ -245,14 +331,62 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
                             <Ionicons name="sparkles" size={18} color="#fff" />
                         </View>
                         <View>
-                            <Text style={styles.headerTitle}>AI Assistant</Text>
+                            <Text style={styles.headerTitle}>StockSense AI</Text>
                             <Text style={styles.headerSubtitle}>Online</Text>
                         </View>
                     </View>
-                    <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-                        <Ionicons name="close" size={24} color="#666" />
-                    </TouchableOpacity>
+                    <View style={styles.headerRight}>
+                        <TouchableOpacity onPress={addNewTab} style={styles.newChatButton}>
+                            <Ionicons name="add" size={20} color={Colors.landing.primaryPurple} />
+                        </TouchableOpacity>
+                        <TouchableOpacity onPress={onClose} style={styles.closeButton}>
+                            <Ionicons name="close" size={24} color="#666" />
+                        </TouchableOpacity>
+                    </View>
                 </View>
+
+                {/* Tab bar */}
+                {tabs.length > 1 && (
+                    <View style={styles.tabBar}>
+                        <ScrollView
+                            ref={tabScrollRef}
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            contentContainerStyle={styles.tabBarContent}
+                        >
+                            {tabs.map(tab => (
+                                <TouchableOpacity
+                                    key={tab.id}
+                                    style={[
+                                        styles.tab,
+                                        tab.id === activeTabId && styles.tabActive,
+                                    ]}
+                                    onPress={() => setActiveTabId(tab.id)}
+                                >
+                                    <Text
+                                        style={[
+                                            styles.tabLabel,
+                                            tab.id === activeTabId && styles.tabLabelActive,
+                                        ]}
+                                        numberOfLines={1}
+                                    >
+                                        {tab.label}
+                                    </Text>
+                                    <TouchableOpacity
+                                        onPress={(e) => { e.stopPropagation(); closeTab(tab.id); }}
+                                        hitSlop={{ top: 8, bottom: 8, left: 4, right: 4 }}
+                                    >
+                                        <Ionicons
+                                            name="close-circle"
+                                            size={14}
+                                            color={tab.id === activeTabId ? Colors.landing.primaryPurple : '#999'}
+                                        />
+                                    </TouchableOpacity>
+                                </TouchableOpacity>
+                            ))}
+                        </ScrollView>
+                    </View>
+                )}
 
                 {/* Messages */}
                 <ScrollView
@@ -262,17 +396,32 @@ export default function ChatWidget({ isOpen, onClose }: ChatWidgetProps) {
                     showsVerticalScrollIndicator={false}
                 >
                     {messages.map((message) => (
-                        <View
-                            key={message.id}
-                            style={[
-                                styles.messageBubble,
-                                message.isUser ? styles.userBubble : styles.aiBubble,
-                            ]}
-                        >
-                            {message.isUser ? (
-                                <Text style={styles.userText}>{message.text}</Text>
-                            ) : (
-                                <Markdown style={markdownStyles as any}>{message.text}</Markdown>
+                        <View key={message.id}>
+                            <View
+                                style={[
+                                    styles.messageBubble,
+                                    message.isUser ? styles.userBubble : styles.aiBubble,
+                                ]}
+                            >
+                                {message.isUser ? (
+                                    <Text style={styles.userText}>{message.text}</Text>
+                                ) : (
+                                    <Markdown style={markdownStyles as any}>{message.text}</Markdown>
+                                )}
+                            </View>
+                            {message.actions && message.actions.length > 0 && (
+                                <View style={styles.actionsContainer}>
+                                    {message.actions.map((action, idx) => (
+                                        <View key={idx} style={styles.actionBadge}>
+                                            <Ionicons
+                                                name={action.action === 'write' ? 'create-outline' : 'search-outline'}
+                                                size={12}
+                                                color={Colors.landing.primaryPurple}
+                                            />
+                                            <Text style={styles.actionText}>{action.purpose}</Text>
+                                        </View>
+                                    ))}
+                                </View>
                             )}
                         </View>
                     ))}
@@ -407,6 +556,16 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         gap: 12,
     },
+    headerRight: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+    },
+    newChatButton: {
+        padding: 8,
+        borderRadius: 8,
+        backgroundColor: 'rgba(52, 23, 85, 0.08)',
+    },
     avatarContainer: {
         width: 36,
         height: 36,
@@ -426,6 +585,37 @@ const styles = StyleSheet.create({
     },
     closeButton: {
         padding: 8,
+    },
+    tabBar: {
+        borderBottomWidth: 1,
+        borderBottomColor: 'rgba(0, 0, 0, 0.05)',
+        backgroundColor: '#fff',
+    },
+    tabBarContent: {
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        gap: 6,
+    },
+    tab: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        paddingHorizontal: 12,
+        paddingVertical: 6,
+        borderRadius: 16,
+        backgroundColor: '#f5f5f5',
+    },
+    tabActive: {
+        backgroundColor: 'rgba(52, 23, 85, 0.1)',
+    },
+    tabLabel: {
+        fontSize: 12,
+        color: '#666',
+        fontWeight: '500',
+    },
+    tabLabelActive: {
+        color: Colors.landing.primaryPurple,
+        fontWeight: '700',
     },
     messagesContainer: {
         flex: 1,
@@ -504,5 +694,27 @@ const styles = StyleSheet.create({
         height: 8,
         borderRadius: 4,
         backgroundColor: Colors.landing.primaryPurple,
+    },
+    actionsContainer: {
+        flexDirection: 'row',
+        flexWrap: 'wrap',
+        gap: 6,
+        paddingHorizontal: 4,
+        paddingBottom: 8,
+        maxWidth: '85%',
+    },
+    actionBadge: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 4,
+        backgroundColor: 'rgba(52, 23, 85, 0.08)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+    },
+    actionText: {
+        fontSize: 11,
+        color: Colors.landing.primaryPurple,
+        fontWeight: '500',
     },
 });

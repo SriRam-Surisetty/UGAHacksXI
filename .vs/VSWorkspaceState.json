@@ -2,7 +2,9 @@
   "ExpandedNodes": [
     "",
     "\\front-end",
-    "\\front-end\\app"
+    "\\front-end\\app",
+    "\\front-end\\services"
   ],
+  "SelectedNode": "\\front-end\\app\\login.tsx",
   "PreviewInSolutionExplorer": false
 }

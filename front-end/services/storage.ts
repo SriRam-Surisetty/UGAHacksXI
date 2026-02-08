@@ -4,8 +4,31 @@ import { Platform } from 'react-native';
 const USER_ID_KEY = 'user_id';
 const TOKEN_KEY = 'auth_token';
 const USER_PROFILE_KEY = 'user_profile';
+const REMEMBER_KEY = 'user_remembered_email';
 
 // --- User ID ---
+export async function saveRememberedEmail(email: string) {
+    if (Platform.OS === 'web') {
+        localStorage.setItem(REMEMBER_KEY, email);
+        return;
+    }
+    await SecureStore.setItemAsync(REMEMBER_KEY, email);
+}
+
+export async function getRememberedEmail() {
+    if (Platform.OS === 'web') {
+        return localStorage.getItem(REMEMBER_KEY);
+    }
+    return await SecureStore.getItemAsync(REMEMBER_KEY);
+}
+
+export async function removeRememberedEmail() {
+    if (Platform.OS === 'web') {
+        localStorage.removeItem(REMEMBER_KEY);
+        return;
+    }
+    await SecureStore.deleteItemAsync(REMEMBER_KEY);
+}
 
 export const saveUserId = async (id: string): Promise<void> => {
     if (Platform.OS === 'web') {

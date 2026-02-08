@@ -14,7 +14,15 @@ import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/theme';
 import api from '@/services/api';
-import { getToken, saveToken, saveUserId } from '@/services/storage';
+// Ensure these functions are exported in your @/services/storage.ts file
+import {
+    getToken,
+    saveToken,
+    saveUserId,
+    saveRememberedEmail,
+    getRememberedEmail,
+    removeRememberedEmail
+} from '@/services/storage';
 
 export default function LoginScreen() {
     const [email, setEmail] = useState('');
@@ -27,18 +35,27 @@ export default function LoginScreen() {
     useEffect(() => {
         let isActive = true;
 
-        const checkSession = async () => {
+        const checkSessionAndPreferences = async () => {
             try {
+                // 1. Check if user is already logged in (Session check)
                 const token = await getToken();
                 if (token && isActive) {
                     router.replace('/Dashboard');
+                    return;
+                }
+
+                // 2. Load the remembered email from local device storage
+                const savedEmail = await getRememberedEmail();
+                if (savedEmail && isActive) {
+                    setEmail(savedEmail);
+                    setRememberMe(true);
                 }
             } catch (error) {
-                // No-op: if storage is unavailable, stay on login screen.
+                console.error("Error loading local storage:", error);
             }
         };
 
-        checkSession();
+        checkSessionAndPreferences();
 
         return () => {
             isActive = false;
@@ -51,18 +68,26 @@ export default function LoginScreen() {
             return;
         }
 
-        if (isLoading) {
-            return;
-        }
-
+        if (isLoading) return;
         setIsLoading(true);
+        setNotice(null);
 
         try {
+            // Check credentials against your MySQL database via the API
             const response = await api.post('/login', { email, password });
 
             if (response.data.access_token) {
+                // 3. Handle Local Remember Me Logic
+                if (rememberMe) {
+                    await saveRememberedEmail(email);
+                } else {
+                    await removeRememberedEmail();
+                }
+
+                // Save session tokens
                 await saveToken(response.data.access_token);
                 await saveUserId(email);
+
                 setNotice({ type: 'success', message: 'Login successful. Redirecting...' });
                 router.replace('/Dashboard');
             }
@@ -71,7 +96,7 @@ export default function LoginScreen() {
             const message =
                 status === 401 || status === 400
                     ? 'Invalid email or password.'
-                    : error.response?.data?.msg || 'An error occurred';
+                    : error.response?.data?.msg || 'An error occurred during sign in.';
             setNotice({ type: 'error', message });
         } finally {
             setIsLoading(false);
@@ -94,6 +119,7 @@ export default function LoginScreen() {
         <SafeAreaView style={styles.container}>
             <StatusBar style="dark" />
 
+            {/* Navigation Header */}
             <View style={styles.nav}>
                 <View style={styles.navContainer}>
                     <TouchableOpacity onPress={navigateToHome} style={styles.logoWrap}>
@@ -118,12 +144,14 @@ export default function LoginScreen() {
                             <Text style={styles.subtitle}>Use your account to get back to your inventory.</Text>
                         </View>
 
+                        {/* Error/Success Notifications */}
                         {notice && (
                             <View style={[styles.notice, notice.type === 'success' ? styles.noticeSuccess : styles.noticeError]}>
                                 <Text style={styles.noticeText}>{notice.message}</Text>
                             </View>
                         )}
 
+                        {/* Form Inputs */}
                         <View style={styles.formGroup}>
                             <Text style={styles.label}>Email</Text>
                             <TextInput
@@ -149,6 +177,7 @@ export default function LoginScreen() {
                             />
                         </View>
 
+                        {/* Options Section */}
                         <View style={styles.formOptions}>
                             <TouchableOpacity
                                 style={styles.rememberMe}
@@ -165,8 +194,11 @@ export default function LoginScreen() {
                             </TouchableOpacity>
                         </View>
 
+                        {/* Action Button */}
                         <TouchableOpacity style={styles.btnPrimary} onPress={handleLogin} disabled={isLoading}>
-                            <Text style={styles.btnPrimaryText}>Sign in</Text>
+                            <Text style={styles.btnPrimaryText}>
+                                {isLoading ? 'Signing in...' : 'Sign in'}
+                            </Text>
                         </TouchableOpacity>
 
                         <View style={styles.inlineFooter}>
@@ -243,6 +275,10 @@ const styles = StyleSheet.create({
         padding: 28,
         borderWidth: 1,
         borderColor: '#e5e7eb',
+        ...Platform.select({
+            ios: { shadowColor: '#000', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.1, shadowRadius: 12 },
+            android: { elevation: 4 },
+        })
     },
     cardDisabled: {
         opacity: 0.6,

@@ -14,13 +14,14 @@ export default function Dashboard() {
 			<StatusBar style="dark" />
 			<AuthHeader activeRoute="/Dashboard" />
 
-			<ScrollView contentContainerStyle={styles.scrollContent} showsVerticalScrollIndicator={false}>
-				<View style={styles.pageHeader}>
-					<Text style={styles.pageTitle}>Daily Overview</Text>
-					<Text style={styles.pageDate}>Saturday, February 7, 2026</Text>
-				</View>
+			<ScrollView contentContainerStyle={styles.page} showsVerticalScrollIndicator={false}>
+				<View style={styles.contentWrapper}>
+					<View style={styles.pageHeader}>
+						<Text style={styles.pageTitle}>Daily Overview</Text>
+						<Text style={styles.pageDate}>Saturday, February 7, 2026</Text>
+					</View>
 
-				<View style={[styles.primaryGrid, isMid && styles.primaryGridWide]}>
+					<View style={[styles.primaryGrid, isMid && styles.primaryGridWide]}>
 					<View style={styles.cardShell}>
 						<View style={styles.cardHeader}>
 							<View style={styles.cardHeaderLeft}>
@@ -90,9 +91,9 @@ export default function Dashboard() {
 							</View>
 						</View>
 					</View>
-				</View>
+					</View>
 
-				<View style={[styles.secondaryGrid, isWide && styles.secondaryGridWide]}>
+					<View style={[styles.secondaryGrid, isWide && styles.secondaryGridWide]}>
 					<View style={[styles.cardShell, styles.cardLarge]}> 
 						<View style={styles.cardHeader}>
 							<Text style={styles.cardHeaderTitle}>Local Demand Signals</Text>
@@ -167,6 +168,7 @@ export default function Dashboard() {
 							</View>
 						</View>
 					</View>
+					</View>
 				</View>
 			</ScrollView>
 		</SafeAreaView>
@@ -208,10 +210,14 @@ const styles = StyleSheet.create({
 		flex: 1,
 		backgroundColor: Colors.landing.lightPurple,
 	},
-	scrollContent: {
-		paddingTop: Platform.OS === 'ios' ? 32 : 24,
-		paddingBottom: 56,
-		paddingHorizontal: 20,
+	page: {
+		paddingVertical: 32,
+		paddingHorizontal: 24,
+	},
+	contentWrapper: {
+		width: '100%',
+		maxWidth: 1280,
+		alignSelf: 'center',
 	},
 	pageHeader: {
 		marginBottom: 20,

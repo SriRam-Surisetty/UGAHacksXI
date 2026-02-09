@@ -25,22 +25,18 @@ logging.basicConfig(
 )
 app.logger.setLevel(logging.DEBUG)
 
-# --- Secure Configuration ---
-# Point this to the exact location of your downloaded ca-certificate.crt
-CA_CERT_PATH = os.path.join(os.path.abspath(os.path.dirname(__file__)), 'certs', 'ca-certificate.crt')
 
-# Database URI and JWT secret are read from environment variables.
-# Fallback values are provided for local development only.
-_DB_USER = os.getenv("DB_USER", "doadmin")
-_DB_PASS = os.getenv("DB_PASS", "AVNS_E1MUlQ8IweUl4B3L72k")
-_DB_HOST = os.getenv("DB_HOST", "db-mysql-nyc3-02019-do-user-33079250-0.j.db.ondigitalocean.com")
-_DB_PORT = os.getenv("DB_PORT", "25060")
-_DB_NAME = os.getenv("DB_NAME", "defaultdb")
+# --- Local Development DB Configuration ---
+# Use local MySQL DB (see db.sql for schema)
+_DB_USER = os.getenv("DB_USER", "root")
+_DB_PASS = os.getenv("DB_PASS", "")
+_DB_HOST = os.getenv("DB_HOST", "127.0.0.1")
+_DB_PORT = os.getenv("DB_PORT", "3306")
+_DB_NAME = os.getenv("DB_NAME", "dish_app")
 
 app.config["SQLALCHEMY_DATABASE_URI"] = os.getenv(
     "DATABASE_URL",
     f"mysql+mysqlconnector://{_DB_USER}:{_DB_PASS}@{_DB_HOST}:{_DB_PORT}/{_DB_NAME}"
-    f"?ssl_ca={CA_CERT_PATH}",
 )
 app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
 app.config["JWT_SECRET_KEY"] = os.getenv("JWT_SECRET_KEY", "super-secure-uga-hacks-key")
